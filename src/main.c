@@ -18,10 +18,7 @@ SDL_Renderer   *rend;
 SDL_Surface    *surf;
 //funcs===============================================
 
-V quit(){
-   SDL_Quit();
-   running=0;
-}
+V quit(){ SDL_Quit();printf("quiting...\n"); running=0; }
 V tick(F dt){
 
 }
@@ -34,7 +31,22 @@ V events(){
    }
 }
 V render(){
+   if (SDL_MUSTLOCK(surf)) SDL_LockSurface(surf);
+   Uint32 * p = surf->pixels;
 
+   for(I y= 0; y< H; y++) {
+   for(I x= 0; x< W; x++) {
+         p[x+y*W]=0xFFFF00FF;
+   }
+   }
+   if (SDL_MUSTLOCK(surf)) SDL_UnlockSurface(surf);
+   
+   SDL_Texture *ScTx = SDL_CreateTextureFromSurface(rend, surf);
+
+   SDL_RenderClear(rend);
+   SDL_RenderCopy(rend, ScTx, NULL, NULL);
+   SDL_RenderPresent(rend);
+   SDL_DestroyTexture( ScTx);
 }
 
 
