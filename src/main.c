@@ -109,9 +109,6 @@ V events(){
 
 
 V render(){
-
-
-
    if (SDL_MUSTLOCK(surf)) SDL_LockSurface(surf);
    Uint32 * p = surf->pixels;
 
@@ -125,12 +122,12 @@ V render(){
    drawDisp(disp2, p);
    if (SDL_MUSTLOCK(surf)) SDL_UnlockSurface(surf);
 
-   SDL_Texture *ScTx = SDL_CreateTextureFromSurface(rend, surf);
+   SDL_Texture *ScTx = SDL_CreateTextureFromSurface(rend, surf);//draw this on top alpha cut
 
    SDL_Rect dst = {0, 0, W, H};
    SDL_RenderClear(rend);
-   //SDL_RenderCopy(rend, ScTx, NULL, NULL);
    SDL_RenderCopy(rend, tx, NULL, &dst);
+   SDL_RenderCopy(rend, ScTx, NULL, NULL);
    SDL_RenderPresent(rend);
    SDL_DestroyTexture( ScTx);
 }
