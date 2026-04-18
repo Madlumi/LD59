@@ -15,7 +15,6 @@
 //macros
 typedef float  F;
 typedef int    I;
-typedef Uint32 UI;
 typedef void   V;
 typedef double D;
 #define R return
@@ -39,8 +38,10 @@ SDL_Surface    *surf;
 SDL_Texture    *tx;
 disp* disp1;
 disp* disp2;
-#define MX_BTNS 5
-Btn* btns[MX_BTNS];
+Btn*  btn1;
+Btn*  btn2;
+Btn*  btn3;
+Btn*  btn4;
 I AlresponseDelay=20;
 I AlsilentCount;
 
@@ -278,31 +279,40 @@ typedef  enum {
    MT_MIX,
    MT_ADD,
 } mixType;
+I mixCol(I c1, I c2, F pow, mixType t){
+   if(pow < 0) pow = 0; if(pow > 1) pow = 1;
+   I a1 = (c1 >> 24) & 0xFF;
+   I r1 = (c1 >> 16) & 0xFF;
+   I g1 = (c1 >> 8)  & 0xFF;
+   I b1 =  c1        & 0xFF;
 
-UI mixCol(UI c1, UI c2, F pow, mixType t){
-   if(pow < 0) pow = 0;
-   if(pow > 1) pow = 1;
+   I a2 = (c2 >> 24) & 0xFF;
+   I r2 = (c2 >> 16) & 0xFF;
+   I g2 = (c2 >> 8)  & 0xFF;
+   I b2 =  c2        & 0xFF;
 
-   #define CH(c, s) (((c) >> (s)) & 0xFFu)
-   #define CL(x) ((x) > 0xFFu ? 0xFFu : (x))
-
-   UI a = t == MT_MIX ? (UI)(CH(c2,24) + (CH(c1,24) - CH(c2,24)) * pow) : CL(CH(c2,24) + (UI)(CH(c1,24) * pow));
-   UI r = t == MT_MIX ? (UI)(CH(c2,16) + (CH(c1,16) - CH(c2,16)) * pow) : CL(CH(c2,16) + (UI)(CH(c1,16) * pow));
-   UI g = t == MT_MIX ? (UI)(CH(c2, 8) + (CH(c1, 8) - CH(c2, 8)) * pow) : CL(CH(c2, 8) + (UI)(CH(c1, 8) * pow));
-   UI b = t == MT_MIX ? (UI)(CH(c2, 0) + (CH(c1, 0) - CH(c2, 0)) * pow) : CL(CH(c2, 0) + (UI)(CH(c1, 0) * pow));
-
-   #undef CH
-   #undef CL
+   I a = 0; I r = 0; I g = 0; I b = 0;
+   if (t==MT_MIX){
+      a = (I)(a2 + ((a1-a2)*pow));
+      r = (I)(r2 + ((r1-r2)*pow));
+      g = (I)(g2 + ((g1-g2)*pow));
+      b = (I)(b2 + ((b1-b2)*pow));
+   }ef(t==MT_ADD){
+      a = a2 + (I)(a1 * pow); if (a > 0xFF) a = 0xFF;
+      r = r2 + (I)(r1 * pow); if (r > 0xFF) r = 0xFF;
+      g = g2 + (I)(g1 * pow); if (g > 0xFF) g = 0xFF;
+      b = b2 + (I)(b1 * pow); if (b > 0xFF) b = 0xFF;
+   }
    return (a << 24) | (r << 16) | (g << 8) | b;
 }
 //draw funcs===============================================
 
+F t = 0;
+V drwSignalDisp(disp* d, Uint32* p){
 #define  h d->B.h
 #define  w d->B.w
 #define  xo d->B.x
 #define  yo d->B.y
-F t = 0;
-V drwSignalDisp(disp* d, Uint32* p){
    for(I y= 0; y< h; y++) {
       for(I x= 0; x< w; x++) {
 
@@ -313,8 +323,14 @@ V drwSignalDisp(disp* d, Uint32* p){
          p[idx]= mixCol(  mixCol(mixCol(signalLog[pnt], 0xFF000000, signalPwrLog[pnt], MT_MIX),mixCol(signalLogA[pnt], 0xFF000000, signalPwrLogA[pnt], MT_MIX),1,MT_ADD) , snoiseLog[pnt], 1,MT_ADD);
       }
    }
+   #undef w
+   #undef h
 }
 V drawDisp(disp* d, Uint32* p){
+#define  h d->B.h
+#define  w d->B.w
+#define  xo d->B.x
+#define  yo d->B.y
    if(d->fnc!=NULL){
       d->fnc(d,p);
    }else{
@@ -326,9 +342,9 @@ V drawDisp(disp* d, Uint32* p){
          }
       }
    }
-}
    #undef w
    #undef h
+}
 I drwCol;
 V setDrwCol(I c){ drwCol=c; }
 V setDrwCol0(){ drwCol=BLACK; }
@@ -410,10 +426,10 @@ V tick(F dt){
    acc+=dt*10;
    t+=dt;
    if(MKEYS[1]){
-      if(inBox(mx, my, (*btns[1]).B)){btns[1]->fnc(); pressPwr+=dt*2; new+=1; };
-      if(inBox(mx, my, (*btns[2]).B)){btns[2]->fnc(); pressPwr+=dt*2; new+=1; };
-      if(inBox(mx, my, (*btns[3]).B)){btns[3]->fnc(); pressPwr+=dt*2; new+=1; };
-      if(inBox(mx, my, (*btns[4]).B)){btns[4]->fnc(); pressPwr+=dt*2; new+=1; };
+      if(inBox(mx, my, (*btn1).B)){btn1->fnc(); pressPwr+=dt*2; new+=1; };
+      if(inBox(mx, my, (*btn2).B)){btn2->fnc(); pressPwr+=dt*2; new+=1; };
+      if(inBox(mx, my, (*btn3).B)){btn3->fnc(); pressPwr+=dt*2; new+=1; };
+      if(inBox(mx, my, (*btn4).B)){btn4->fnc(); pressPwr+=dt*2; new+=1; };
       if(pressPwr>1){pressPwr=1;}
    }else{ pressPwr-=dt*3; if(pressPwr<0){pressPwr=0;} }
    while(acc > 0){
@@ -472,9 +488,10 @@ V render(){
    SDL_RenderClear(rend);
    SDL_RenderCopy(rend, tx, NULL, &dst);
    SDL_RenderCopy(rend, ScTx, NULL, NULL);
-   for(I i = 0; i < MX_BTNS; i++){
-      drwBtn(btns[i]);
-   }
+   drwBtn(btn1);
+   drwBtn(btn2);
+   drwBtn(btn3);
+   drwBtn(btn4);
    SDL_RenderPresent(rend);
    SDL_DestroyTexture( ScTx);
 }
@@ -487,9 +504,7 @@ V mainLoop(){
 }
 
 I init(){
-   //display
-   disp1 = newDisp((Box){265, 30, 320 , 240}, NULL);
-   //signal scope
+   disp1 = newDisp((Box){220, 20, 320 , 288}, NULL);
    disp2 = newDisp((Box){200, 290, signalLogW, 60}, drwSignalDisp);
    running=1;
 
@@ -499,11 +514,10 @@ I init(){
       t++;
       generateNoiseSignal();}
 
-   btns[1] = newBtn((Box){200, 350, 100, 100}, "res/btn.png", "res/btnH.png","res/btnP.png", setDrwCol1);
-   btns[2] = newBtn((Box){320, 350, 100, 100}, "res/btn.png", "res/btnH.png","res/btnP.png", setDrwCol2);
-   btns[3] = newBtn((Box){440, 350, 100, 100}, "res/btn.png", "res/btnH.png","res/btnP.png", setDrwCol3);
-   btns[4] = newBtn((Box){560, 350, 100, 100}, "res/btn.png", "res/btnH.png","res/btnP.png", setDrwCol4);
-   btns[0] = newBtn((Box){700, 330, 100, 100}, "res/btn.png", "res/btnH.png","res/btnP.png", setDrwCol4);
+   btn1 = newBtn((Box){200, 350, 100, 100}, "res/btn.png", "res/btnH.png","res/btnP.png", setDrwCol1);
+   btn2 = newBtn((Box){320, 350, 100, 100}, "res/btn.png", "res/btnH.png","res/btnP.png", setDrwCol2);
+   btn3 = newBtn((Box){440, 350, 100, 100}, "res/btn.png", "res/btnH.png","res/btnP.png", setDrwCol3);
+   btn4 = newBtn((Box){560, 350, 100, 100}, "res/btn.png", "res/btnH.png","res/btnP.png", setDrwCol4);
    printf("init'd\n");
    return 1;
 }
