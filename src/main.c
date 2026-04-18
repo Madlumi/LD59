@@ -1,7 +1,9 @@
 //main.c===============================================
+#include <SDL2/SDL_stdinc.h>
 #include <SDL2/SDL_surface.h>
 #include <SDL2/SDL.h>
 #include <stdlib.h>
+#include <wchar.h>
 //macros
 typedef float  F;
 typedef int    I;
@@ -9,8 +11,9 @@ typedef void   V;
 typedef double D;
 #define R return
 typedef struct {I x,y,w,h;} Box;
-typedef struct {Box B; SDL_Surface* sf;} disp;
+typedef struct _disp{Box B; SDL_Surface* sf; V (*fnc)(struct _disp* , Uint32* );} disp;
 disp* disp1;
+disp* disp2;
 //declares============================================
 #define W 948
 #define H 533
@@ -21,6 +24,10 @@ I running;
 SDL_Window     *wind;
 SDL_Renderer   *rend;
 SDL_Surface    *surf;
+
+#define  signalLogW 300
+Uint32 signalLog[signalLogW];
+I signalLogPoint=0;
 
 //funcs===============================================
 
@@ -37,22 +44,44 @@ V events(){
    }
 }
 
-disp* newDisp(Box b){
+disp* newDisp(Box b, V (* f)(disp* , Uint32* )){
    disp *d= malloc(sizeof(Box));
    d->B=b;
+   d->fnc=NULL;
+   if(f!=NULL){ d->fnc=f; }
    d->sf= SDL_CreateRGBSurface(0, b.w , b.h, 32, 0, 0, 0, 0);
    return d;
+}
+
+V drwSignalDisp(disp* d, Uint32* p){
+   #define  h d->B.h
+   #define  w d->B.w
+   #define  xo d->B.x
+   #define  yo d->B.y
+      for(I y= 0; y< h; y++) {
+         for(I x= 0; x< w; x++) {
+            I idx = (x+xo)+(y+yo)*W;
+            if(idx>=PS || idx < 0){continue;}
+            p[idx]=0xFF771111;
+         }
+      }
+   #undef w
+   #undef h
 }
 V drawDisp(disp* d, Uint32* p){
    #define  h d->B.h
    #define  w d->B.w
    #define  xo d->B.x
    #define  yo d->B.y
-   for(I y= 0; y< h; y++) {
-      for(I x= 0; x< w; x++) {
-         I idx = (x+xo)+(y+yo)*W;
-         if(idx>=PS || idx < 0){continue;}
-         p[idx]=0xFF111111;
+   if(d->fnc!=NULL){
+      d->fnc(d,p);
+   }else{
+      for(I y= 0; y< h; y++) {
+         for(I x= 0; x< w; x++) {
+            I idx = (x+xo)+(y+yo)*W;
+            if(idx>=PS || idx < 0){continue;}
+            p[idx]=0xFF111111;
+         }
       }
    }
    #undef w
@@ -69,6 +98,7 @@ V render(){
    }
 
    drawDisp(disp1, p);
+   drawDisp(disp2, p);
    if (SDL_MUSTLOCK(surf)) SDL_UnlockSurface(surf);
 
    SDL_Texture *ScTx = SDL_CreateTextureFromSurface(rend, surf);
@@ -93,7 +123,8 @@ I main(){
    SDL_CreateWindowAndRenderer(W, H, 0, &wind, &rend);
    surf= SDL_CreateRGBSurface(0, W , H, 32, 0, 0, 0, 0);
 
-   disp1 = newDisp((Box){40, 40, 500, 1200});
+   disp1 = newDisp((Box){40, 40, 300, 200}, NULL);
+   disp2 = newDisp((Box){40, 250, 300, 30}, drwSignalDisp);
    running=1;
 
    #ifdef __EMSCRIPTEN__
