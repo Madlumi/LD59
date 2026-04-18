@@ -1,7 +1,10 @@
 //main.c===============================================
+#include <SDL2/SDL_render.h>
 #include <SDL2/SDL_stdinc.h>
 #include <SDL2/SDL_surface.h>
+#include <SDL2/SDL_image.h>
 #include <SDL2/SDL.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <wchar.h>
 //macros
@@ -12,6 +15,7 @@ typedef double D;
 #define R return
 typedef struct {I x,y,w,h;} Box;
 typedef struct _disp{Box B; SDL_Surface* sf; V (*fnc)(struct _disp* , Uint32* );} disp;
+typedef struct {Box B; SDL_Texture* tx; SDL_Texture* txH;SDL_Texture* txP; V (*fnc)(V);} Btn;
 disp* disp1;
 disp* disp2;
 //declares============================================
@@ -24,26 +28,13 @@ I running;
 SDL_Window     *wind;
 SDL_Renderer   *rend;
 SDL_Surface    *surf;
+SDL_Texture *tx;
 
 #define  signalLogW 300
 Uint32 signalLog[signalLogW];
-I signalLogPoint=0;
+F signalLogPoint=0;
 
-//funcs===============================================
-
-V quit(){ SDL_Quit();printf("quiting...\n"); running=0; }
-V tick(F dt){
-
-}
-V events(){
-   SDL_Event e;
-   while(SDL_PollEvent(&e)){
-      if(e.type==SDL_QUIT){
-         quit();
-      }
-   }
-}
-
+//initializers===============================================================
 disp* newDisp(Box b, V (* f)(disp* , Uint32* )){
    disp *d= malloc(sizeof(Box));
    d->B=b;
@@ -52,6 +43,10 @@ disp* newDisp(Box b, V (* f)(disp* , Uint32* )){
    d->sf= SDL_CreateRGBSurface(0, b.w , b.h, 32, 0, 0, 0, 0);
    return d;
 }
+Btn* newBtn(Box B, char* pth, char* pthHov, char* pthPress, V (* f)){
+   return NULL;
+}
+//draw funcs===============================================
 
 V drwSignalDisp(disp* d, Uint32* p){
    #define  h d->B.h
@@ -60,9 +55,10 @@ V drwSignalDisp(disp* d, Uint32* p){
    #define  yo d->B.y
       for(I y= 0; y< h; y++) {
          for(I x= 0; x< w; x++) {
+
             I idx = (x+xo)+(y+yo)*W;
             if(idx>=PS || idx < 0){continue;}
-            p[idx]=0xFF771111;
+            p[idx]=signalLog[(x+(I)signalLogPoint)%signalLogW];
          }
       }
    #undef w
@@ -87,13 +83,41 @@ V drawDisp(disp* d, Uint32* p){
    #undef w
    #undef h
 }
+//=============================================================================
+V quit(){ SDL_Quit();printf("quiting...\n"); running=0; }
+F acc=0;
+
+V tick(F dt){
+   acc+=dt*10;
+   while(acc > 0){
+      signalLogPoint+=1;
+      signalLog[((I)signalLogPoint-1)% signalLogW]=0;
+      if(rand()%10==1){
+         signalLog[((I)signalLogPoint-1)% signalLogW]=rand()%0xFFFFFFFF;
+      }
+      acc-=1;
+   }
+}
+V events(){
+   SDL_Event e;
+   while(SDL_PollEvent(&e)){
+      if(e.type==SDL_QUIT){
+         quit();
+      }
+   }
+}
+
+
 V render(){
+
+
+
    if (SDL_MUSTLOCK(surf)) SDL_LockSurface(surf);
    Uint32 * p = surf->pixels;
 
    for(I y= 0; y< H; y++) {
       for(I x= 0; x< W; x++) {
-         p[x+y*W]=0xFFFF00FF;
+         p[x+y*W]=0x00000000;
       }
    }
 
@@ -103,8 +127,10 @@ V render(){
 
    SDL_Texture *ScTx = SDL_CreateTextureFromSurface(rend, surf);
 
+   SDL_Rect dst = {0, 0, W, H};
    SDL_RenderClear(rend);
-   SDL_RenderCopy(rend, ScTx, NULL, NULL);
+   //SDL_RenderCopy(rend, ScTx, NULL, NULL);
+   SDL_RenderCopy(rend, tx, NULL, &dst);
    SDL_RenderPresent(rend);
    SDL_DestroyTexture( ScTx);
 }
@@ -118,14 +144,25 @@ V mainLoop(){
    render();
 }
 
+I init(){
+   disp1 = newDisp((Box){40, 40, 300, 200}, NULL);
+   disp2 = newDisp((Box){40, 250, 300, 30}, drwSignalDisp);
+   running=1;
+
+   tx=IMG_LoadTexture(rend, "res/ld59.png");
+   if (!tx) { printf("IMG_LoadTexture failed: %s\n", IMG_GetError()); return 0;}
+   for(I i = 0; i < signalLogW; i++){
+   signalLog[i]=rand()%0xFFFFFFFF;
+   }
+   printf("init'd\n");
+   return 1;
+}
 I main(){
    SDL_Init(SDL_INIT_VIDEO);
    SDL_CreateWindowAndRenderer(W, H, 0, &wind, &rend);
    surf= SDL_CreateRGBSurface(0, W , H, 32, 0, 0, 0, 0);
 
-   disp1 = newDisp((Box){40, 40, 300, 200}, NULL);
-   disp2 = newDisp((Box){40, 250, 300, 30}, drwSignalDisp);
-   running=1;
+   if(!init()){return 1;}
 
    #ifdef __EMSCRIPTEN__
    emscripten_set_main_loop(mainLoop, 0, 1);
