@@ -7,23 +7,31 @@ CFLAGS_NATIVE := `sdl2-config --cflags`
 LIBS_NATIVE   := `sdl2-config --libs` -lSDL2_image -lm
 
 
+
 linux:
 	@mkdir -p $(LOUT)
 	gcc src/main.c $(CFLAGS_NATIVE) $(LIBS_NATIVE) -o $(LOUT)/$(NAME)
 
 run: linux
 	./$(LOUT)/$(NAME)
-	
+
+debug-run: 
+	gcc -g -O0 -fsanitize=address,undefined -fno-omit-frame-pointer src/main.c `sdl2-config --cflags` `sdl2-config --libs` -lSDL2_image -lm -o out/LD59
+	./out/LD59
 wasm:
-	@#emcc fuckery
 	@mkdir -p build $(WOUT)
-	emcc -c src/main.c -o build/$(NAME).o -sUSE_SDL=2
-	emcc build/$(NAME).o -o $(WOUT)/$(NAME).js -sUSE_SDL=2 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=0
-	@# keep the page alongside wasm outputs
-	@cp -f $(NAME)_raw.html $(WOUT)/$(NAME)_raw.html 2>/dev/null || true
+	emcc -c src/main.c -o build/$(NAME).o \
+		--use-port=sdl2 \
+		--use-port=sdl2_image:formats=png
+	emcc build/$(NAME).o -o $(WOUT)/$(NAME).html \
+		--use-port=sdl2 \
+		--use-port=sdl2_image:formats=png \
+		--preload-file res \
+		-sALLOW_MEMORY_GROWTH=1 \
+		-sEXIT_RUNTIME=0
 	
 runwasm: wasm
-	#add liek a python serve thingie
+	cd $(WOUT) && python3 -m http.server 8000
 	
 windows:
 	#migw or something

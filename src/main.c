@@ -1,4 +1,8 @@
 //main.c===============================================
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #include <SDL2/SDL_render.h>
 #include <SDL2/SDL_stdinc.h>
 #include <SDL2/SDL_surface.h>
@@ -13,11 +17,10 @@ typedef int    I;
 typedef void   V;
 typedef double D;
 #define R return
+#define ef else if
 typedef struct {I x,y,w,h;} Box;
 typedef struct _disp{Box B; SDL_Surface* sf; V (*fnc)(struct _disp* , Uint32* );} disp;
-typedef struct {Box B; SDL_Texture* tx; SDL_Texture* txH;SDL_Texture* txP; V (*fnc)(V);} Btn;
-disp* disp1;
-disp* disp2;
+typedef struct {Box B; SDL_Texture* tx; SDL_Texture* txH;SDL_Texture* txP; V (*fnc)(V); I status;} Btn;
 //declares============================================
 #define W 948
 #define H 533
@@ -28,15 +31,19 @@ I running;
 SDL_Window     *wind;
 SDL_Renderer   *rend;
 SDL_Surface    *surf;
-SDL_Texture *tx;
+SDL_Texture    *tx;
+disp* disp1;
+disp* disp2;
+Btn*  btn1;
 
 #define  signalLogW 300
 Uint32 signalLog[signalLogW];
 F signalLogPoint=0;
 
+V quit(){ SDL_Quit();printf("quiting...\n"); running=0; }
 //initializers===============================================================
 disp* newDisp(Box b, V (* f)(disp* , Uint32* )){
-   disp *d= malloc(sizeof(Box));
+   disp *d= malloc(sizeof(disp));
    d->B=b;
    d->fnc=NULL;
    if(f!=NULL){ d->fnc=f; }
@@ -44,7 +51,15 @@ disp* newDisp(Box b, V (* f)(disp* , Uint32* )){
    return d;
 }
 Btn* newBtn(Box B, char* pth, char* pthHov, char* pthPress, V (* f)){
-   return NULL;
+   Btn *b = malloc(sizeof(Btn));
+   b->B=B;
+   b->tx=IMG_LoadTexture(rend, pth);
+   b->txH=IMG_LoadTexture(rend, pthHov);
+   b->txP=IMG_LoadTexture(rend, pthPress);
+   if (!tx) { printf("IMG_LoadTexture failed: %s\n", IMG_GetError()); quit();}
+   if(f!=NULL){ b->fnc=f; }
+   b->status=0;
+   return b;
 }
 //draw funcs===============================================
 
@@ -84,7 +99,6 @@ V drawDisp(disp* d, Uint32* p){
    #undef h
 }
 //=============================================================================
-V quit(){ SDL_Quit();printf("quiting...\n"); running=0; }
 F acc=0;
 
 V tick(F dt){
@@ -98,16 +112,33 @@ V tick(F dt){
       acc-=1;
    }
 }
+I mx; I my;
+#define mkeyn 12 
+I MKEYS[mkeyn];
 V events(){
    SDL_Event e;
+   SDL_GetMouseState(&mx, &my);
+   for(int i = 0; i < mkeyn; i++){if(MKEYS[i]>1){MKEYS[i]--;}}
    while(SDL_PollEvent(&e)){
-      if(e.type==SDL_QUIT){
-         quit();
-      }
+      if (e.type == SDL_QUIT){ quit(); }
+      ef (e.type == SDL_MOUSEBUTTONDOWN){ if(e.button.button>= mkeyn){continue;} ;MKEYS[e.button.button]=2;}
+      ef (e.type == SDL_MOUSEBUTTONUP){   if(e.button.button>= mkeyn){continue;} ;MKEYS[e.button.button]=0;}
    }
 }
 
+I inBox(I x, I y, Box B){
+   if(x<B.x || y< B.y){return 0;}
+   if(x-B.w > B.x || y-B.h> B.y){return 0;}
+   
+   return 1;
+}
 
+V drwBtn(Btn* b){
+   SDL_Rect dst = {b->B.x, b->B.y, b->B.w, 30};
+   if(inBox(mx, my, (*b).B)){ 
+      SDL_RenderCopy(rend, b->txH, NULL, &dst);
+   }else{ SDL_RenderCopy(rend, b->tx, NULL, &dst); }
+}
 V render(){
    if (SDL_MUSTLOCK(surf)) SDL_LockSurface(surf);
    Uint32 * p = surf->pixels;
@@ -128,6 +159,7 @@ V render(){
    SDL_RenderClear(rend);
    SDL_RenderCopy(rend, tx, NULL, &dst);
    SDL_RenderCopy(rend, ScTx, NULL, NULL);
+   drwBtn(btn1);
    SDL_RenderPresent(rend);
    SDL_DestroyTexture( ScTx);
 }
@@ -148,9 +180,9 @@ I init(){
 
    tx=IMG_LoadTexture(rend, "res/ld59.png");
    if (!tx) { printf("IMG_LoadTexture failed: %s\n", IMG_GetError()); return 0;}
-   for(I i = 0; i < signalLogW; i++){
-   signalLog[i]=rand()%0xFFFFFFFF;
-   }
+   for(I i = 0; i < signalLogW; i++){ signalLog[i]=rand()%0xFFFFFFFF; }//tmp noise
+
+   btn1 = newBtn((Box){40, 300, 30, 30}, "res/btn.png", "res/btnH.png","res/btnP.png", NULL);
    printf("init'd\n");
    return 1;
 }
@@ -160,6 +192,7 @@ I main(){
    surf = SDL_CreateRGBSurfaceWithFormat(0, W, H, 32, SDL_PIXELFORMAT_ARGB8888);
 
    if(!init()){return 1;}
+
 
    #ifdef __EMSCRIPTEN__
    emscripten_set_main_loop(mainLoop, 0, 1);
