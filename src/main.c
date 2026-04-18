@@ -15,6 +15,7 @@
 #include <stdlib.h>
 //flags
 #define printfps 1
+#define printLog 1
 //macros
 
 typedef float  F;
@@ -36,6 +37,11 @@ static I fpsFrames = 0;
 #define H 533
 #define PS W*H
 I running;
+I hp; I fuel; I fuelMax=10, hpMax=10;
+V reset(){
+   hp=hpMax;
+   fuel=fuelMax*.7;
+}
 
 typedef struct {
     char path[128];
@@ -46,6 +52,10 @@ enum txIdx {
     TXspace,
     TXbg,
     TXfg,
+    TXmeter,
+    TXhullmeter,
+    TXquestion,
+    TXcross,
     TXbook0,
     TX_COUNT
 };
@@ -54,6 +64,10 @@ txture txs[TX_COUNT] = {
     [TXspace] = { "res/screen/space180x120.png", NULL },
     [TXbg] = { "res/ld59bg.png", NULL },
     [TXfg] = { "res/ld59fg.png", NULL },
+    [TXmeter] = { "res/meter.png", NULL },
+    [TXhullmeter] = { "res/hullmeter.png", NULL },
+    [TXquestion] = { "res/qestion.png", NULL },
+    [TXcross] = { "res/crosshair.png", NULL },
     [TXbook0] = { "res/book/ld59book_0000.png", NULL },
 };
 
@@ -102,6 +116,7 @@ typedef enum {
    Back_off, Agree, Disagree,
    Msg_COUNT
 } Msg;
+I actTaken[Msg_COUNT];
 
 
 
@@ -186,7 +201,26 @@ MsgCode alienTalk4[Msg_COUNT] = {
 };
 
 F mood= 0;
-I alienType=0;
+I alienType=2;
+V printStats(){
+   if(!printLog){return;}
+   printf("fuel: %d\n", fuel);
+   printf("hp:   %d\n", fuel);
+   printf("Mood: %.2f\n", mood);
+   printf("alien: %d\n",  alienType);
+}
+V addFuel(){
+   fuel++;
+   if(fuel>fuelMax){fuel=fuelMax;}
+}
+V rmFuel(){
+   fuel--;
+   if(fuel<0){fuel=0;printf("outta fuel");}
+}
+V takeDmg(){
+   hp-=1;
+   if(hp<0){hp=0;printf("outta hp");}
+}
 MsgCode *getAlienBook(void){
    if(alienType==0){ return alienTalk1; }
    if(alienType==1){ return alienTalk2; }
@@ -207,12 +241,22 @@ Msg decodeAlienMsg(sigCol in[4]){
    }
    return Question;
 }
+I alienShow=0;
+V alienAttack(){
+   printf("uwu'd\n");
+   alienShow=0;
+   takeDmg();
+}
 MsgCode alienInterpret(sigCol in[4]){
    Msg m = decodeAlienMsg(in);
    MsgCode *book = getAlienBook();
 
    if(!msgKnown(book, m)){ return alienTalkStandard[Question]; }
 
+   I taken = actTaken[m];
+   actTaken[m] = 1;
+   #define one if(!taken)
+   #define two if(taken)
    if(alienType==0){
       if(m==Refuel      ) { return book[Agree]; }
       if(m==Hi          ) { return book[Agree]; } 
@@ -245,19 +289,13 @@ MsgCode alienInterpret(sigCol in[4]){
    }
 
    if(alienType==2){
-      if(m==Refuel      ) { return book[Agree]; }
-      if(m==Hi          ) { return book[Agree]; } 
-      if(m==Question    ) { return book[Agree]; }
-      if(m==Ignore      ) { return book[Agree]; }
-      if(m==Refuel      ) { return book[Agree]; }
-      if(m==Rearm       ) { return book[Agree]; }
-      if(m==Figth       ) { return book[Agree]; }
-      if(m==Happy       ) { return book[Agree]; }
-      if(m==Angry       ) { return book[Agree]; }
-      if(m==Hostile     ) { return book[Agree]; }
-      if(m==Back_off    ) { return book[Agree]; }
-      if(m==Agree       ) { return book[Agree]; }
-      if(m==Disagree    ) { return book[Agree]; }
+      if(m==Hi          ) {one{mood+=.2;} return book[Hi];  } 
+      if(m==Refuel      ) {one{}  return mood>.7 ? book[Agree] : book[Disagree]; }
+      if(m==Happy       ) {one{if(mood>.5){mood += .2;}} return mood>.7 ? book[Happy] : book[Disagree]; }
+      if(m==Angry       ) {one{if(mood<.5){mood -= .2;}} return mood<.4 ? book[Angry] : book[Disagree]; }
+      if(m==Back_off    ) {one{printf("awo\n");} two{alienAttack();}mood=0; return book[Back_off]; }
+      if(m==Agree       ) {one{} return book[Question]; }
+      if(m==Disagree    ) {one{} return book[Question]; }
    }
    if(alienType==3){
       if(m==Refuel      ) { return book[Agree]; }
@@ -409,21 +447,14 @@ V readSignalbuffer(){
       if(c==BLUE){   printf("B\n"); }
       if(c==PINK){   printf("P\n"); }
    }
-   printf("\n\n");
-   for(I i = 0; i < cnt ; i++){
-      I c = m.in[i];
-      if(c==RED){    printf("R\n"); }
-      if(c==GREEN){  printf("G\n"); }
-      if(c==BLUE){   printf("B\n"); }
-      if(c==PINK){   printf("P\n"); }
-   }
 
    for (I i = 0; i < 4; i++) {
       resp[i] = m.in[i];
    }
+   printStats();
    respCnt=0;
-   respSpeed=20;
-   respGap=10;
+   respSpeed=5;
+   respGap=3;
    respProg=0;
    for(I i = 0; i < cnt ; i++){
       I c = resp[i];
@@ -435,20 +466,35 @@ V readSignalbuffer(){
    
 }
 I new = 0;
+I newReady=0;
 F pressPwr=0;
+V newAlien(){
+   alienType=2;
+   mood=rand()%100*.01;
+   for(I i= 0; i <Msg_COUNT;i++){ actTaken[i]=0; }
+   alienShow=1;
+}
 V tick(F dt){
-   acc+=dt*10;
+   acc+=dt*30;
    t+=dt;
+   if(!alienShow){new=0;}
+   if(MKEYS[1]==2){
+      for(I i = 0; i < MX_BTNS; i++){
+           if(inBox(mx, my, (*btns[i]).B)){btns[i]->fnc();}
+      }
+   }
    if(MKEYS[1]){
-      if(inBox(mx, my, (*btns[1]).B)){btns[1]->fnc(); pressPwr+=dt*2; new+=1; };
-      if(inBox(mx, my, (*btns[2]).B)){btns[2]->fnc(); pressPwr+=dt*2; new+=1; };
-      if(inBox(mx, my, (*btns[3]).B)){btns[3]->fnc(); pressPwr+=dt*2; new+=1; };
-      if(inBox(mx, my, (*btns[4]).B)){btns[4]->fnc(); pressPwr+=dt*2; new+=1; };
+      if(inBox(mx, my, (*btns[1]).B)){btns[1]->fnc(); pressPwr+=dt*6; new+=1*newReady;newReady=0; }
+      ef(inBox(mx, my, (*btns[2]).B)){btns[2]->fnc(); pressPwr+=dt*6; new+=1*newReady;newReady=0; }
+      ef(inBox(mx, my, (*btns[3]).B)){btns[3]->fnc(); pressPwr+=dt*6; new+=1*newReady;newReady=0; }
+      ef(inBox(mx, my, (*btns[4]).B)){btns[4]->fnc(); pressPwr+=dt*6; new+=1*newReady;newReady=0; }
+      else{newReady=1; }
       if(pressPwr>1){pressPwr=1;}
-   }else{ pressPwr-=dt*3; if(pressPwr<0){pressPwr=0;} }
+   }else{ pressPwr-=dt*7; if(pressPwr<0){pressPwr=0;} newReady=1; }
    while(acc > 0){
       generateNoiseSignal();
       signalLog[sigIdx]=0;
+      signalLogA[sigIdx]=0;
 
       if(pressPwr>.01){signalLog[sigIdx]=drwCol; signalPwrLog[sigIdx]=pressPwr;}
       if(respCnt<4) { 
@@ -457,9 +503,10 @@ V tick(F dt){
          if(respProg>respSpeed+respGap){respCnt+=1; respProg=0;}
 
       }
-      if(signalLog[sigIdx]==0&&new>4){AlsilentCount++;}else{AlsilentCount=0;}
+      if(signalLog[sigIdx]==0){AlsilentCount++;}else{AlsilentCount=0;}
 
-      if(AlsilentCount>AlresponseDelay){new=0; AlsilentCount=0 ; readSignalbuffer();  printf("WEWOO\n"); }
+      if(AlsilentCount>AlresponseDelay&& new>=4){ new=0; readSignalbuffer();AlsilentCount=0;}
+      ef(AlsilentCount>AlresponseDelay*1.5){ new=0; AlsilentCount=0;}
       acc-=1;
    }
 }
@@ -497,9 +544,9 @@ V render(){
 
    SDL_Texture *ScTx = SDL_CreateTextureFromSurface(rend, surf);//draw this on top alpha cut
 
-   SDL_Rect dst = {0, 0, W, H};
    SDL_RenderClear(rend);
    //background
+   SDL_Rect dst = {0, 0, W, H};
    SDL_RenderCopy(rend, txs[TXbg].tx, NULL, &dst);
    SDL_RenderCopy(rend, ScTx, NULL, NULL);
    drawDisp(disp1, p);
@@ -509,7 +556,25 @@ V render(){
       drwBtn(btns[i]);
    }
    SDL_Rect bookdst = {-30, 170, 300, 300};
-   SDL_RenderCopy(rend, txs[TXfg].tx, NULL, &dst);
+
+   //draw meter
+   float PER=1-((F)fuel/(F)fuelMax);
+   I meterH=190;
+   SDL_Rect meterdst= {600, 50+meterH*PER, 100, 190-meterH*PER};
+   SDL_Rect metersrc= {0, 0+meterH*PER, 100, 190-meterH*PER};
+   SDL_RenderCopy(rend, txs[TXmeter].tx, &metersrc, &meterdst);
+   
+   //
+
+   SDL_RenderCopy(rend, txs[TXfg].tx, NULL, &dst);//FG=====================================
+   //hull meter
+   float hPER=((F)hp/(F)hpMax);
+   I hullmeterw=135;
+   SDL_Rect hmeterdst= {248, 230, hullmeterw*hPER, 40};
+   SDL_Rect hmetersrc= {0,   0, hullmeterw*hPER, 40};
+   SDL_RenderCopy(rend, txs[TXhullmeter].tx, &hmetersrc, &hmeterdst);
+   //
+
    SDL_RenderCopy(rend, txs[TXbook0].tx, NULL, &bookdst);
       drwBtn(btns[1]);
    //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
@@ -571,6 +636,23 @@ V mainLoop(){
 #endif
 }
 
+
+V OPTflyAway(){
+   //if (mood<.5){takeDmg();}
+   rmFuel();
+   newAlien();
+   printStats();
+
+}
+V OPTtrade(){
+   if (mood>.65){addFuel();}
+   else {takeDmg();}
+   if (mood<.5){takeDmg();}
+   printStats();
+}
+V OPTfight(){
+   printStats();
+}
 V initBTN(){
    int btnH = 75;
    int btnW = 85;
@@ -589,13 +671,14 @@ V initBTN(){
    btns[3] = newBtn((Box){signalBtnsX + signalBtnXOff * 2, signalBtnY, btnW, btnH}, "res/btns/btnBN.png", "res/btns/btnBH.png", "res/btns/btnBP.png", setDrwCol3);
    btns[4] = newBtn((Box){signalBtnsX + signalBtnXOff * 3, signalBtnY, btnW, btnH}, "res/btns/btnPN.png", "res/btns/btnPH.png", "res/btns/btnPP.png", setDrwCol4);
 
-   btns[0] = newBtn((Box){diagBtnsX + diagBtnXOff * 0, diagBtnsY + diagBtnYOff * 0, btnW, btnH}, "res/btns/btnN.png", "res/btns/btnH.png", "res/btns/btnP.png", setDrwCol4);
-   btns[5] = newBtn((Box){diagBtnsX + diagBtnXOff * 1, diagBtnsY + diagBtnYOff * 1, btnW, btnH}, "res/btns/btnN.png", "res/btns/btnH.png", "res/btns/btnP.png", setDrwCol4);
-   btns[6] = newBtn((Box){diagBtnsX + diagBtnXOff * 2, diagBtnsY + diagBtnYOff * 2, btnW, btnH}, "res/btns/btnN.png", "res/btns/btnH.png", "res/btns/btnP.png", setDrwCol4);
+   btns[0] = newBtn((Box){diagBtnsX + diagBtnXOff * 0, diagBtnsY + diagBtnYOff * 0, btnW, btnH}, "res/btns/btnN.png", "res/btns/btnH.png", "res/btns/btnP.png", OPTtrade);
+   btns[5] = newBtn((Box){diagBtnsX + diagBtnXOff * 1, diagBtnsY + diagBtnYOff * 1, btnW, btnH}, "res/btns/btnN.png", "res/btns/btnH.png", "res/btns/btnP.png", OPTflyAway);
+   btns[6] = newBtn((Box){diagBtnsX + diagBtnXOff * 2, diagBtnsY + diagBtnYOff * 2, btnW, btnH}, "res/btns/btnN.png", "res/btns/btnH.png", "res/btns/btnP.png", OPTfight);
 
 }
 I init(){
    running=1;
+   reset();
    //display
    disp1 = newDisp((Box){245, 30, 360 , 240}, drwMainDisp);
    //signal scope
@@ -611,6 +694,7 @@ I init(){
       txs[i].tx = IMG_LoadTexture(rend, txs[i].path);
       if (!txs[i].tx) { printf("IMG_LoadTexture failed: %s\n", IMG_GetError()); return 0;}
    }
+ newAlien();
    printf("init'd\n");
    return 1;
 }
