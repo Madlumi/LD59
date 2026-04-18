@@ -1,8 +1,10 @@
 //main.c===============================================
+#include <SDL2/SDL_rect.h>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
 
+#include <time.h>
 #include "mnoise.h"
 #include <SDL2/SDL_render.h>
 #include <SDL2/SDL_stdinc.h>
@@ -12,7 +14,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <wchar.h>
+//flags
+#define printfps 1
 //macros
+
 typedef float  F;
 typedef int    I;
 typedef Uint32 UI;
@@ -24,10 +29,32 @@ typedef struct {I x,y,w,h;} Box;
 typedef struct _disp{Box B; SDL_Surface* sf; V (*fnc)(struct _disp* , Uint32* );} disp;
 typedef struct {Box B; SDL_Texture* tx; SDL_Texture* txH;SDL_Texture* txP; V (*fnc)(V); I status;} Btn;
 //declares============================================
+#if printfps
+static F fpsTimer = 0;
+static I fpsFrames = 0;
+#endif
 #define W 948
 #define H 533
 #define PS W*H
 I running;
+
+typedef struct {
+    char path[128];
+    SDL_Texture *tx;
+} txture;
+
+enum txIdx {
+    TXspace,
+    TXbg,
+    TXfg,
+    TX_COUNT
+};
+
+txture txs[TX_COUNT] = {
+    [TXspace] = { "res/screen/space180x120.png", NULL },
+    [TXbg] = { "res/ld59bg.png", NULL },
+    [TXfg] = { "res/ld59fg.png", NULL },
+};
 
 I mx; I my; //mouse
 #define mkeyn 12 
@@ -36,10 +63,9 @@ I MKEYS[mkeyn];
 SDL_Window     *wind;
 SDL_Renderer   *rend;
 SDL_Surface    *surf;
-SDL_Texture    *tx;
 disp* disp1;
 disp* disp2;
-#define MX_BTNS 5
+#define MX_BTNS 7
 Btn* btns[MX_BTNS];
 I AlresponseDelay=20;
 I AlsilentCount;
@@ -62,10 +88,10 @@ I inBox(I x, I y, Box B){
 
 typedef enum {
    BLACK =  0xFF000000,
-   RED =    0xFFE69F00,
-   BLUE =   0xFF56B4E9,
-   GREEN=   0xFF009E73,
-   PINK =   0xFFCC79A7,
+   RED   = 0xFFFF94B2,
+   GREEN = 0xFF3ADE19,
+   BLUE = 0xFFFFFB2B,
+   PINK  = 0xFFB048F9,
 } sigCol;
 
 typedef enum {
@@ -269,7 +295,6 @@ Btn* newBtn(Box B, char* pth, char* pthHov, char* pthPress, V (* f)){
    b->tx=IMG_LoadTexture(rend, pth);
    b->txH=IMG_LoadTexture(rend, pthHov);
    b->txP=IMG_LoadTexture(rend, pthPress);
-   if (!tx) { printf("IMG_LoadTexture failed: %s\n", IMG_GetError()); quit();}
    if(f!=NULL){ b->fnc=f; }
    b->status=0;
    return b;
@@ -297,6 +322,10 @@ UI mixCol(UI c1, UI c2, F pow, mixType t){
 }
 //draw funcs===============================================
 
+V drwMainDisp(disp* d, Uint32* p){
+   SDL_Rect dst= {(*d).B.x,(*d).B.y,(*d).B.w,(*d).B.h};
+   SDL_RenderCopy(rend, txs[TXspace].tx, NULL, &dst);
+}
 #define  h d->B.h
 #define  w d->B.w
 #define  xo d->B.x
@@ -462,7 +491,6 @@ V render(){
       }
    }
 
-   drawDisp(disp1, p);
    drawDisp(disp2, p);
    if (SDL_MUSTLOCK(surf)) SDL_UnlockSurface(surf);
 
@@ -470,40 +498,113 @@ V render(){
 
    SDL_Rect dst = {0, 0, W, H};
    SDL_RenderClear(rend);
-   SDL_RenderCopy(rend, tx, NULL, &dst);
+   //background
+   SDL_RenderCopy(rend, txs[TXbg].tx, NULL, &dst);
    SDL_RenderCopy(rend, ScTx, NULL, NULL);
+   drawDisp(disp1, p);
    for(I i = 0; i < MX_BTNS; i++){
       drwBtn(btns[i]);
    }
+   SDL_RenderCopy(rend, txs[TXfg].tx, NULL, &dst);
+   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
+   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
+   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
+   if(MKEYS[2]==2){
+      time_t t = time(NULL);
+      struct tm *tmv = localtime(&t);
+      if(!tmv){ printf("localtime fail\n"); return; }
+
+      char path[64];
+      strftime(path, sizeof(path), "shot_%H%M%S.png", tmv);
+
+      SDL_Surface *shot = SDL_CreateRGBSurfaceWithFormat(0, W, H, 32, SDL_PIXELFORMAT_ARGB8888);
+      if(!shot){ printf("screenshot surface fail: %s\n", SDL_GetError()); return; }
+
+      if(SDL_RenderReadPixels(rend, NULL, SDL_PIXELFORMAT_ARGB8888, shot->pixels, shot->pitch) != 0){
+         printf("SDL_RenderReadPixels fail: %s\n", SDL_GetError());
+         SDL_FreeSurface(shot);
+         return;
+      }
+
+      if(IMG_SavePNG(shot, path) != 0){
+         printf("IMG_SavePNG fail: %s\n", IMG_GetError());
+      }else{
+         printf("saved %s\n", path);
+      }
+
+      SDL_FreeSurface(shot);
+   }
+   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
+   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
+   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
    SDL_RenderPresent(rend);
    SDL_DestroyTexture( ScTx);
 }
 
 
 V mainLoop(){
+   static Uint64 last = 0;
+   Uint64 now = SDL_GetPerformanceCounter();
+   if(last == 0){ last = now; }
+
+   F dt = (F)(now - last) / (F)SDL_GetPerformanceFrequency();
+   last = now;
+
    events();
-   tick(1.0/60);//dirty pliz remember to fix
+   tick(dt);
    render();
+
+#if printfps
+   fpsTimer += dt;
+   fpsFrames += 1;
+   if(fpsTimer >= 1.0f){
+      printf("fps: %d\n", fpsFrames);
+      fpsFrames = 0;
+      fpsTimer -= 1.0f;
+   }
+#endif
 }
 
+V initBTN(){
+   int btnH = 75;
+   int btnW = 85;
+
+   int signalBtnsX = 210;
+   int signalBtnY = 370;
+   int signalBtnXOff = 120;
+
+   int diagBtnsX = 660;
+   int diagBtnsY = 285;
+   int diagBtnXOff = 70;
+   int diagBtnYOff = 77;
+
+   btns[1] = newBtn((Box){signalBtnsX + signalBtnXOff * 0, signalBtnY, btnW, btnH}, "res/btns/btnRN.png", "res/btns/btnRH.png", "res/btns/btnRP.png", setDrwCol1);
+   btns[2] = newBtn((Box){signalBtnsX + signalBtnXOff * 1, signalBtnY, btnW, btnH}, "res/btns/btnGN.png", "res/btns/btnGH.png", "res/btns/btnGP.png", setDrwCol2);
+   btns[3] = newBtn((Box){signalBtnsX + signalBtnXOff * 2, signalBtnY, btnW, btnH}, "res/btns/btnBN.png", "res/btns/btnBH.png", "res/btns/btnBP.png", setDrwCol3);
+   btns[4] = newBtn((Box){signalBtnsX + signalBtnXOff * 3, signalBtnY, btnW, btnH}, "res/btns/btnPN.png", "res/btns/btnPH.png", "res/btns/btnPP.png", setDrwCol4);
+
+   btns[0] = newBtn((Box){diagBtnsX + diagBtnXOff * 0, diagBtnsY + diagBtnYOff * 0, btnW, btnH}, "res/btns/btnN.png", "res/btns/btnH.png", "res/btns/btnP.png", setDrwCol4);
+   btns[5] = newBtn((Box){diagBtnsX + diagBtnXOff * 1, diagBtnsY + diagBtnYOff * 1, btnW, btnH}, "res/btns/btnN.png", "res/btns/btnH.png", "res/btns/btnP.png", setDrwCol4);
+   btns[6] = newBtn((Box){diagBtnsX + diagBtnXOff * 2, diagBtnsY + diagBtnYOff * 2, btnW, btnH}, "res/btns/btnN.png", "res/btns/btnH.png", "res/btns/btnP.png", setDrwCol4);
+
+}
 I init(){
+   running=1;
    //display
-   disp1 = newDisp((Box){265, 30, 320 , 240}, NULL);
+   disp1 = newDisp((Box){245, 30, 360 , 240}, drwMainDisp);
    //signal scope
    disp2 = newDisp((Box){200, 290, signalLogW, 60}, drwSignalDisp);
-   running=1;
 
-   tx=IMG_LoadTexture(rend, "res/ld59.png");
-   if (!tx) { printf("IMG_LoadTexture failed: %s\n", IMG_GetError()); return 0;}
-   for(I i = 0; i < signalLogW; i++){ 
-      t++;
-      generateNoiseSignal();}
+   //init empty signal
+   for(I i = 0; i < signalLogW; i++){ t++; generateNoiseSignal();}
 
-   btns[1] = newBtn((Box){200, 350, 100, 100}, "res/btn.png", "res/btnH.png","res/btnP.png", setDrwCol1);
-   btns[2] = newBtn((Box){320, 350, 100, 100}, "res/btn.png", "res/btnH.png","res/btnP.png", setDrwCol2);
-   btns[3] = newBtn((Box){440, 350, 100, 100}, "res/btn.png", "res/btnH.png","res/btnP.png", setDrwCol3);
-   btns[4] = newBtn((Box){560, 350, 100, 100}, "res/btn.png", "res/btnH.png","res/btnP.png", setDrwCol4);
-   btns[0] = newBtn((Box){700, 330, 100, 100}, "res/btn.png", "res/btnH.png","res/btnP.png", setDrwCol4);
+   initBTN();
+
+
+   for (int i = 0; i < TX_COUNT; i++) {
+      txs[i].tx = IMG_LoadTexture(rend, txs[i].path);
+      if (!txs[i].tx) { printf("IMG_LoadTexture failed: %s\n", IMG_GetError()); return 0;}
+   }
    printf("init'd\n");
    return 1;
 }
@@ -518,11 +619,23 @@ I main(){
 #ifdef __EMSCRIPTEN__
    emscripten_set_main_loop(mainLoop, 0, 1);
 #else
-   while(running) {        
+   const F target = 1.0f / 60.0f;
+
+   while(running){
+      Uint64 frameStart = SDL_GetPerformanceCounter();
+
       mainLoop();
-      SDL_Delay(8);
+
+      Uint64 frameEnd = SDL_GetPerformanceCounter();
+      F frameTime = (F)(frameEnd - frameStart) / (F)SDL_GetPerformanceFrequency();
+
+      if(frameTime < target){
+         SDL_Delay((Uint32)((target - frameTime) * 1000.0f));
+      }
+
    }
 #endif 
+return 0;
 
 }
 //eof main.c============================================
