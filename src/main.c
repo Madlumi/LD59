@@ -36,11 +36,14 @@ static I fpsFrames = 0;
 #define W 948
 #define H 533
 #define PS W*H
+I alienX, alienY;
 I running;
 I hp; I fuel; I fuelMax=10, hpMax=10;
+F alienCd=3;
 V reset(){
    hp=hpMax;
    fuel=fuelMax*.7;
+   alienCd=3;
 }
 
 typedef struct {
@@ -473,8 +476,12 @@ V newAlien(){
    mood=rand()%100*.01;
    for(I i= 0; i <Msg_COUNT;i++){ actTaken[i]=0; }
    alienShow=1;
+   alienX=(rand()%140+20)*2;
+   alienY=(rand()%60+30)*2;
+
 }
 V tick(F dt){
+   if(alienCd>=0){alienCd-=dt;if(alienCd<=0.01){alienCd=-1 ; newAlien();}}
    acc+=dt*30;
    t+=dt;
    if(!alienShow){new=0;}
@@ -557,16 +564,21 @@ V render(){
    }
    SDL_Rect bookdst = {-30, 170, 300, 300};
 
-   //draw meter
-   float PER=1-((F)fuel/(F)fuelMax);
-   I meterH=190;
-   SDL_Rect meterdst= {600, 50+meterH*PER, 100, 190-meterH*PER};
-   SDL_Rect metersrc= {0, 0+meterH*PER, 100, 190-meterH*PER};
-   SDL_RenderCopy(rend, txs[TXmeter].tx, &metersrc, &meterdst);
-   
+   /*meter   */ float PER=1-((F)fuel/(F)fuelMax);
+   /*meter   */ I meterH=190;
+   /*meter   */ SDL_Rect meterdst= {600, 50+meterH*PER, 100, 190-meterH*PER};
+   /*meter   */ SDL_Rect metersrc= {0, 0+meterH*PER, 100, 190-meterH*PER};
+   /*meter   */ SDL_RenderCopy(rend, txs[TXmeter].tx, &metersrc, &meterdst);
+   /*CROSSHAIR*/ if(alienShow){
+  /*CROSSHAIR*/ SDL_Rect clip = {245, 30, 360, 240}, crossdst = {245 + alienX - 352, 30 + alienY - 59, 421, 283};
+  /*CROSSHAIR*/ SDL_RenderSetClipRect(rend, &clip); 
+  /*CROSSHAIR*/ SDL_RenderCopy(rend, txs[TXcross].tx, NULL, &crossdst); 
+  /*CROSSHAIR*/ SDL_RenderSetClipRect(rend, NULL);
+   /*CROSSHAIR*/}
    //
-
    SDL_RenderCopy(rend, txs[TXfg].tx, NULL, &dst);//FG=====================================
+  /*Question */ SDL_Rect quedst = {430, 220, 200, 50};
+  /*Question */ if(alienShow){SDL_RenderCopy(rend, txs[TXquestion].tx, NULL, &quedst);}
    //hull meter
    float hPER=((F)hp/(F)hpMax);
    I hullmeterw=135;
@@ -576,7 +588,7 @@ V render(){
    //
 
    SDL_RenderCopy(rend, txs[TXbook0].tx, NULL, &bookdst);
-      drwBtn(btns[1]);
+   drwBtn(btns[1]);
    //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
    //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
    //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
@@ -640,7 +652,7 @@ V mainLoop(){
 V OPTflyAway(){
    //if (mood<.5){takeDmg();}
    rmFuel();
-   newAlien();
+   alienCd=rand()%5;
    printStats();
 
 }
@@ -694,7 +706,6 @@ I init(){
       txs[i].tx = IMG_LoadTexture(rend, txs[i].path);
       if (!txs[i].tx) { printf("IMG_LoadTexture failed: %s\n", IMG_GetError()); return 0;}
    }
- newAlien();
    printf("init'd\n");
    return 1;
 }
