@@ -91,9 +91,9 @@ V tick(F dt){
    acc+=dt*10;
    while(acc > 0){
       signalLogPoint+=1;
-      signalLog[((I)signalLogPoint-1)% signalLogW]=0;
+      signalLog[((I)signalLogPoint-1)% signalLogW]=0xFF000000;
       if(rand()%10==1){
-         signalLog[((I)signalLogPoint-1)% signalLogW]=rand()%0xFFFFFFFF;
+         signalLog[((I)signalLogPoint-1)% signalLogW]=rand()%0xFFFFFFFF|0xFF000000;
       }
       acc-=1;
    }
@@ -157,7 +157,7 @@ I init(){
 I main(){
    SDL_Init(SDL_INIT_VIDEO);
    SDL_CreateWindowAndRenderer(W, H, 0, &wind, &rend);
-   surf= SDL_CreateRGBSurface(0, W , H, 32, 0, 0, 0, 0);
+   surf = SDL_CreateRGBSurfaceWithFormat(0, W, H, 32, SDL_PIXELFORMAT_ARGB8888);
 
    if(!init()){return 1;}
 
