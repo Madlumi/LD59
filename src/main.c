@@ -13,7 +13,6 @@
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <wchar.h>
 //flags
 #define printfps 1
 //macros
@@ -47,6 +46,7 @@ enum txIdx {
     TXspace,
     TXbg,
     TXfg,
+    TXbook0,
     TX_COUNT
 };
 
@@ -54,6 +54,7 @@ txture txs[TX_COUNT] = {
     [TXspace] = { "res/screen/space180x120.png", NULL },
     [TXbg] = { "res/ld59bg.png", NULL },
     [TXfg] = { "res/ld59fg.png", NULL },
+    [TXbook0] = { "res/book/ld59book_0000.png", NULL },
 };
 
 I mx; I my; //mouse
@@ -155,7 +156,7 @@ MsgCode alienTalk2[Msg_COUNT] = {
 };
 
 MsgCode alienTalk3[Msg_COUNT] = {
-   [Hi]        = { { BLUE,  GREEN, PINK,  RED   }, Hi        },
+   [Hi]        = { { GREEN, BLUE, GREEN, GREEN }, Hi        },
    [Question]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
    [Ignore]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
    [Refuel]    = { { RED,   PINK,  GREEN, BLUE  }, Refuel    },
@@ -502,10 +503,15 @@ V render(){
    SDL_RenderCopy(rend, txs[TXbg].tx, NULL, &dst);
    SDL_RenderCopy(rend, ScTx, NULL, NULL);
    drawDisp(disp1, p);
+
+
    for(I i = 0; i < MX_BTNS; i++){
       drwBtn(btns[i]);
    }
+   SDL_Rect bookdst = {-30, 170, 300, 300};
    SDL_RenderCopy(rend, txs[TXfg].tx, NULL, &dst);
+   SDL_RenderCopy(rend, txs[TXbook0].tx, NULL, &bookdst);
+      drwBtn(btns[1]);
    //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
    //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
    //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
