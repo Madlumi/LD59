@@ -6,6 +6,7 @@
 
 #include <time.h>
 #include "mnoise.h"
+#include "msine.h"
 #include <SDL2/SDL_render.h>
 #include <SDL2/SDL_stdinc.h>
 #include <SDL2/SDL_surface.h>
@@ -326,7 +327,7 @@ MsgCode alienInterpret(sigCol in[4]){
 
 
 
-V quit(){ SDL_Quit();printf("quiting...\n"); running=0; }
+V quit(){ printf("quiting...\n");sinePlayerQuit(); running=0;SDL_Quit(); printf("quit\n"); }
 //initializers===============================================================
 disp* newDisp(Box b, V (* f)(disp* , Uint32* )){
    disp *d= malloc(sizeof(disp));
@@ -378,6 +379,7 @@ V drwMainDisp(disp* d, Uint32* p){
 #define  xo d->B.x
 #define  yo d->B.y
 F t = 0;
+#define SigDispCol mixCol(  mixCol(mixCol(signalLog[pnt], 0xFF000000, signalPwrLog[pnt], MT_MIX),mixCol(signalLogA[pnt], 0xFF000000, signalPwrLogA[pnt], MT_MIX),1,MT_ADD) , snoiseLog[pnt], 1,MT_ADD) 
 V drwSignalDisp(disp* d, Uint32* p){
    for(I y= 0; y< h; y++) {
       for(I x= 0; x< w; x++) {
@@ -386,7 +388,8 @@ V drwSignalDisp(disp* d, Uint32* p){
          if(idx>=PS || idx < 0){continue;}
          I noise=rand()%2 + (I)(2.0*rnd((F)(y+t*126)*.1)-1);
          I pnt=((x+noise+(I)signalLogPoint)%signalLogW);
-         p[idx]= mixCol(  mixCol(mixCol(signalLog[pnt], 0xFF000000, signalPwrLog[pnt], MT_MIX),mixCol(signalLogA[pnt], 0xFF000000, signalPwrLogA[pnt], MT_MIX),1,MT_ADD) , snoiseLog[pnt], 1,MT_ADD);
+         p[idx]= SigDispCol;
+         if(x==w-5){ sinePlayerFreq(SigDispCol);}
       }
    }
 }
@@ -423,7 +426,7 @@ V generateNoiseSignal(){
       I g =(I)(Perlin1D(t*2+37731)*0xFF)&0xFF;
       I b =(I)(Perlin1D(t*2.3+12567)*0xFF)&0xFF;
       I noise = 0xFF000000 | (r << 16) | (g << 8) | b;
-      F noiseStr=Perlin1D(t*5)*.2;
+      F noiseStr=Perlin1D(t*115)*.2;
       snoiseLog[((I)signalLogPoint-1)% signalLogW]= mixCol(noise, 0xFF000000, noiseStr, MT_MIX);
 }
 
@@ -521,6 +524,8 @@ V tick(F dt){
       ef(AlsilentCount>AlresponseDelay*1.5){ new=0; AlsilentCount=0;}
       acc-=1;
    }
+
+   
 }
 V events(){
    SDL_Event e;
@@ -542,6 +547,8 @@ V drwBtn(Btn* b){
    }else{ SDL_RenderCopy(rend, b->tx, NULL, &dst); }
 }
 V render(){
+
+   sinePlayerTick();
    if (SDL_MUSTLOCK(surf)) SDL_LockSurface(surf);
    Uint32 * p = surf->pixels;
 
@@ -714,6 +721,10 @@ I init(){
       if (!txs[i].tx) { printf("IMG_LoadTexture failed: %s\n", IMG_GetError()); return 0;}
    }
    printf("init'd\n");
+
+   SDL_Init(SDL_INIT_AUDIO);
+   sinePlayerInit();
+
    return 1;
 }
 I main(){
