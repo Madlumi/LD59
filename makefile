@@ -1,16 +1,17 @@
 
-PNAME ?= LD59
+NAME ?= LD59
 WOUT  ?= LD59
-LOUT  ?= out 
+LOUT  ?= out
 
 CFLAGS_NATIVE := `sdl2-config --cflags`
 LIBS_NATIVE   := `sdl2-config --libs` -lSDL2_image -lm
 
 
 linux:
-	@mkdir -p out
+	@mkdir -p $(LOUT)
 	gcc src/main.c $(CFLAGS_NATIVE) $(LIBS_NATIVE) -o $(LOUT)/$(NAME)
-run:
+
+run: linux
 	./$(LOUT)/$(NAME)
 	
 wasm:
@@ -21,7 +22,7 @@ wasm:
 	@# keep the page alongside wasm outputs
 	@cp -f $(NAME)_raw.html $(WOUT)/$(NAME)_raw.html 2>/dev/null || true
 	
-runwasm:
+runwasm: wasm
 	#add liek a python serve thingie
 	
 windows:
