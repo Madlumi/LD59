@@ -245,11 +245,16 @@ Msg decodeAlienMsg(sigCol in[4]){
    return Question;
 }
 I alienShow=0;
+I alienRefueled=0;
 V alienAttack(){
    printf("uwu'd\n");
    alienShow=0;
    takeDmg();
 }
+V playSoundError( ){}
+
+
+
 MsgCode alienInterpret(sigCol in[4]){
    Msg m = decodeAlienMsg(in);
    MsgCode *book = getAlienBook();
@@ -293,7 +298,7 @@ MsgCode alienInterpret(sigCol in[4]){
 
    if(alienType==2){
       if(m==Hi          ) {one{mood+=.2;} return book[Hi];  } 
-      if(m==Refuel      ) {one{}  return mood>.7 ? book[Agree] : book[Disagree]; }
+      if(m==Refuel      ) {one{ }  return mood>.7 ? book[Agree] : book[Disagree]; }
       if(m==Happy       ) {one{if(mood>.5){mood += .2;}} return mood>.7 ? book[Happy] : book[Disagree]; }
       if(m==Angry       ) {one{if(mood<.5){mood -= .2;}} return mood<.4 ? book[Angry] : book[Disagree]; }
       if(m==Back_off    ) {one{printf("awo\n");} two{alienAttack();}mood=0; return book[Back_off]; }
@@ -657,6 +662,8 @@ V OPTflyAway(){
 
 }
 V OPTtrade(){
+   if(alienRefueled){return; playSoundError();}
+   alienRefueled=1;
    if (mood>.65){addFuel();}
    else {takeDmg();}
    if (mood<.5){takeDmg();}
