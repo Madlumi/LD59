@@ -22,9 +22,18 @@ F maxVol=3;
    A3 = 220.00f
    C4 = 261.63f
    */
-/*C3*/ F Rfreq = 130.81f;
-/*C4*/ F Gfreq = 261.63f;
-/*C5*/ F Bfreq = 523.25f;
+//c octaves
+F Rfreq = 130.81f;
+F Gfreq = 261.63f;
+F Bfreq = 523.25f;
+//5thOctave
+//F Rfreq = 130.81f;
+//F Gfreq = 392.00f;
+//F Bfreq = 587.33f;
+//F Rfreq = 65.41f;
+//F Gfreq = 196.00f;
+//F Bfreq = 293.66f;
+
 F Rpow=0, Gpow=0, Bpow=0;
 F RpowT=0, GpowT=0, BpowT=0;
 

@@ -44,12 +44,42 @@ enum txIdx {
     TXrocketshade,
     TXVol,TXVolpeg,TXVolpegL,
     TXbook0,
+    TXprog,
     TX_COUNT
+};
+enum animId{
+    ANship,
+    ANshoot,
+    ANboom,
+    ANwarp,
+    ANfire,
+    AN_COUNT
 };
 typedef struct {
     char path[128];
     SDL_Texture *tx;
 } txture;
+
+
+
+int animsCnt[AN_COUNT] = {
+    [ANship] = 120,
+    [ANshoot] = 16,
+    [ANwarp] = 12,
+    [ANboom] = 24,
+    [ANfire] = 24,
+};
+
+txture anims[AN_COUNT] = {
+    [ANship] = { "res/anim/ship/", NULL },
+    [ANshoot] = { "res/anim/shoot/", NULL },
+    [ANboom] = { "res/anim/boom/", NULL },
+    [ANwarp] = { "res/anim/warp/", NULL },
+    [ANfire] = { "res/anim/fire/", NULL },
+};
+
+txture *animFrames[AN_COUNT] = {0};
+
 txture txs[TX_COUNT] = {
     [TXspace] = { "res/screen/space180x120.png", NULL },
     [TXbg] = { "res/ld59bg.png", NULL },
@@ -64,6 +94,7 @@ txture txs[TX_COUNT] = {
     [TXVolpeg] = { "res/volumePeg.png", NULL },
     [TXVolpegL] = { "res/volumePegLift.png", NULL },
     [TXbook0] = { "res/book/ld59book_0000.png", NULL },
+    [TXprog] = { "res/progui.png", NULL },
 };
 //Enums===========================================================================================================================================
 //Enums===========================================================================================================================================
@@ -89,6 +120,11 @@ typedef struct {
    Msg    m;
 } MsgCode;
 //declares============================================
+
+MsgCode alienInterpret(sigCol in[4]);
+MsgCode *getAlienBook(void);
+Msg decodeAlienMsg(sigCol in[4]);
+
 V reset();
 I inBox(I x, I y, Box B);
 V printStats();
@@ -117,6 +153,8 @@ V tick(F dt);
 V events();
 V drwBtn(Btn* b);
 V render();
+V warp();
+V fight();
 V mainLoop();
 V OPTflyAway();
 V OPTtrade();
@@ -124,8 +162,68 @@ V OPTfight();
 V initBTN();
 I init();
 I main();
+//random declares==========================================================================================
+//random declares==========================================================================================
+//random declares==========================================================================================
+#if printfps
+static F fpsTimer = 0;
+static I fpsFrames = 0;
+#endif
+#define W 948
+#define H 533
+#define PS W*H
+#define BGNoiseStr .1
+I alienX, alienY;
+I running;
+I hp; I fuel; I fuelMax=5, hpMax=5, ammo, ammoMax=3, prog, progMAX=10;
+I won=0;
+I lost=0;
+F alienCd=3;
 
+
+
+
+I mx; I my; //mouse
+#define mkeyn 12 
+I MKEYS[mkeyn];
+
+SDL_Window     *wind;
+SDL_Renderer   *rend;
+SDL_Surface    *surf;
+disp* disp1;
+disp* disp2;
+#define MX_EBTNS 3
+Btn* ebtns[MX_EBTNS];
+I ebtn;
+
+#define MX_BTNS 7
+Btn* btns[MX_BTNS];
+I AlresponseDelay=20;
+I AlsilentCount;
+F RwarpPowNoise=0;
+F GwarpPowNoise=0;
+F BwarpPowNoise=0;
+#define  warpDecay .95;
+#define  signalLogW 450
+Uint32 signalLog[signalLogW];
+F signalPwrLog[signalLogW];
+Uint32 signalLogA[signalLogW];
+F signalPwrLogA[signalLogW];
+Uint32 snoiseLog[signalLogW];
+F signalLogPoint=0;
+I actTaken[Msg_COUNT];
+F mood= 0;
+I alienType=2;
 //arrays=============================================
+
+typedef enum {
+   ALbug,
+   ALgrey,
+   ALslime,
+   ALcyber,
+   Alien_COUNT
+} AlienType;
+
 MsgCode alienTalkStandard[Msg_COUNT] = {
    [Hi]        = { { BLACK, BLACK, BLACK, BLACK }, Hi       },
    [Question]  = { { RED,   BLUE,  GREEN, PINK  }, Question },
@@ -201,55 +299,103 @@ MsgCode alienTalk4[Msg_COUNT] = {
    [Disagree]  = { { BLUE,  RED,   PINK,  GREEN }, Disagree  },
 };
 
+F playShootMax=1.6;
+F playShoot=-1;
+F boomEffect=-1;
+F warpEffectMax=.9;
+F warpEffect=-1;
+F fireEffectMax=2;
+F fireEffect=-1;
+
+typedef struct {
+   //-1 to 1, negative means they need to be under that possitive value, ie intimidation
+   F rerefuel; // + 1 fuel
+   F rearm;    // + 1 ammo
+   F fireFlee; // will fire at you if you run away
+}alienTreshold;
+
+alienTreshold alienTresholds[Alien_COUNT] = {
+   [ALbug]   = { .rerefuel =  0.0f, .rearm = 0.0f, .fireFlee = -1.0f },
+   [ALgrey]  = { .rerefuel =  0.2f, .rearm = 0.4f, .fireFlee = -0.8f },
+   [ALslime] = { .rerefuel =  0.7f, .rearm = 0.8f, .fireFlee =  0.3f },
+   [ALcyber] = { .rerefuel = -0.2f, .rearm = 0.5f, .fireFlee =  0.8f },
+};
+
+MsgCode alienInterpret(sigCol in[4]){
+   Msg m = decodeAlienMsg(in);
+   MsgCode *book = getAlienBook();
+
+   if(!msgKnown(book, m)){ return alienTalkStandard[Question]; }
+
+   I taken = actTaken[m];
+   actTaken[m] = 1;
+   #define one if(!taken)
+   #define two if(taken)
+   alienTreshold *t = &alienTresholds[alienType];
+   #define moodPass(v) ((v) < 0 ? (mood <= -(v)) : (mood >= (v)))
+
+   if(alienType==ALbug){
+      if(m==Refuel      ) { return book[Agree]; }
+      if(m==Rearm       ) { return book[Agree]; }
+      if(m==Figth       ) { return book[Agree]; }
+      if(m==Happy       ) { return book[Agree]; }
+      if(m==Angry       ) { return book[Agree]; }
+      if(m==Hostile     ) { return book[Agree]; }
+      if(m==Agree       ) { return book[Agree]; }
+      if(m==Disagree    ) { return book[Agree]; }
+   }
+
+   if(alienType==ALgrey){
+      if(m==Hi          ) { return book[Agree]; }
+      if(m==Refuel      ) { return book[Agree]; }
+      if(m==Figth       ) { return book[Agree]; }
+      if(m==Hostile     ) { return book[Agree]; }
+      if(m==Back_off    ) { return book[Agree]; }
+      if(m==Agree       ) { return book[Agree]; }
+      if(m==Disagree    ) { return book[Agree]; }
+   }
+
+   if(alienType==ALslime){
+      if(m==Hi          ) {one{mood+=.2;}                                   return book[Hi];  } 
+      if(m==Refuel      ) {one{}                                            return moodPass(t->rerefuel) ? book[Agree] : book[Disagree]; }
+      if(m==Happy       ) {one{mood += .2;}                                 return mood>.7 ? book[Happy] : book[Disagree]; }
+      if(m==Angry       ) {one{if(mood<.5){mood -= .2;}}                    return mood<.4 ? book[Angry] : book[Disagree]; }
+      if(m==Back_off    ) {one{}          two{alienAttack();}mood=0;        return book[Back_off]; }
+      if(m==Agree       ) {one{}                                            return book[Happy]; }
+      if(m==Disagree    ) {one{}                                            return book[Angry]; }
+   }
+
+   if(alienType==ALcyber){
+      if(m==Hi          ) { return book[Agree]; }
+      if(m==Figth       ) { return book[Agree]; }
+      if(m==Angry       ) { return book[Agree]; }
+      if(m==Hostile     ) { return book[Agree]; }
+      if(m==Back_off    ) { return book[Agree]; }
+      if(m==Agree       ) { return book[Agree]; }
+      if(m==Disagree    ) { return book[Agree]; }
+   }
+
+   return book[m];
+}
+
+
 //declares============================================
-#if printfps
-static F fpsTimer = 0;
-static I fpsFrames = 0;
-#endif
-#define W 948
-#define H 533
-#define PS W*H
-#define BGNoiseStr .1
-I alienX, alienY;
-I running;
-I hp; I fuel; I fuelMax=10, hpMax=10, ammo, ammoMax=3;
-F alienCd=3;
+F t = 0;
+I alienShow=0; 
+I alienRefueled=0;
 V reset(){
+   won=0;
+   lost=0;
    hp=hpMax;
-   
+   prog=0;
+   alienShow=0;
+   alienRefueled=0;
+   for(I i = 0; i < signalLogW; i++){ snoiseLog[i]=0xFF000000; signalLog[i]=0xFF000000; signalLogA[i]=0xFF000000; signalPwrLogA[i]=0;signalPwrLog[i]=0;}
+   for(I i = 0; i < signalLogW; i++){ t++; generateNoiseSignal(); }
    ammo=ammoMax;
    fuel=fuelMax*.7;
    alienCd=3;
 }
-
-
-
-
-I mx; I my; //mouse
-#define mkeyn 12 
-I MKEYS[mkeyn];
-
-SDL_Window     *wind;
-SDL_Renderer   *rend;
-SDL_Surface    *surf;
-disp* disp1;
-disp* disp2;
-#define MX_BTNS 7
-Btn* btns[MX_BTNS];
-I AlresponseDelay=20;
-I AlsilentCount;
-
-F RwarpPowNoise=0;
-F GwarpPowNoise=0;
-F BwarpPowNoise=0;
-#define  warpDecay .95;
-#define  signalLogW 450
-Uint32 signalLog[signalLogW];
-F signalPwrLog[signalLogW];
-Uint32 signalLogA[signalLogW];
-F signalPwrLogA[signalLogW];
-Uint32 snoiseLog[signalLogW];
-F signalLogPoint=0;
 
 //helpers
 I inBox(I x, I y, Box B){
@@ -259,14 +405,10 @@ I inBox(I x, I y, Box B){
    return 1;
 }
 
-I actTaken[Msg_COUNT];
 
 
 
 
-
-F mood= 0;
-I alienType=2;
 V printStats(){
    if(!printLog){return;}
    printf("fuel: %d\n", fuel);
@@ -280,11 +422,11 @@ V addFuel(){
 }
 V rmFuel(){
    fuel--;
-   if(fuel<0){fuel=0;printf("outta fuel");}
+   if(fuel<0){fuel=0;printf("outta fuel"); lost=1; ebtn=1; }
 }
 V takeDmg(){
    hp-=1;
-   if(hp<0){hp=0;printf("outta hp");}
+   if(hp<0){hp=0;printf("outta hp"); lost=1; ebtn=2;}
 }
 MsgCode *getAlienBook(void){
    if(alienType==0){ return alienTalk1; }
@@ -306,8 +448,6 @@ Msg decodeAlienMsg(sigCol in[4]){
    }
    return Question;
 }
-I alienShow=0;
-I alienRefueled=0;
 V alienLeave(){
    F warpPowNoise=1.5;
    alienShow=0;
@@ -332,74 +472,6 @@ V playSoundError( ){}
 
 
 
-MsgCode alienInterpret(sigCol in[4]){
-   Msg m = decodeAlienMsg(in);
-   MsgCode *book = getAlienBook();
-
-   if(!msgKnown(book, m)){ return alienTalkStandard[Question]; }
-
-   I taken = actTaken[m];
-   actTaken[m] = 1;
-   #define one if(!taken)
-   #define two if(taken)
-   if(alienType==0){
-      if(m==Refuel      ) { return book[Agree]; }
-      if(m==Hi          ) { return book[Agree]; } 
-      if(m==Question    ) { return book[Agree]; }
-      if(m==Ignore      ) { return book[Agree]; }
-      if(m==Refuel      ) { return book[Agree]; }
-      if(m==Rearm       ) { return book[Agree]; }
-      if(m==Figth       ) { return book[Agree]; }
-      if(m==Happy       ) { return book[Agree]; }
-      if(m==Angry       ) { return book[Agree]; }
-      if(m==Hostile     ) { return book[Agree]; }
-      if(m==Back_off    ) { return book[Agree]; }
-      if(m==Agree       ) { return book[Agree]; }
-      if(m==Disagree    ) { return book[Agree]; }
-   }
-   if(alienType==1){
-      if(m==Refuel      ) { return book[Agree]; }
-      if(m==Hi          ) { return book[Agree]; } 
-      if(m==Question    ) { return book[Agree]; }
-      if(m==Ignore      ) { return book[Agree]; }
-      if(m==Refuel      ) { return book[Agree]; }
-      if(m==Rearm       ) { return book[Agree]; }
-      if(m==Figth       ) { return book[Agree]; }
-      if(m==Happy       ) { return book[Agree]; }
-      if(m==Angry       ) { return book[Agree]; }
-      if(m==Hostile     ) { return book[Agree]; }
-      if(m==Back_off    ) { return book[Agree]; }
-      if(m==Agree       ) { return book[Agree]; }
-      if(m==Disagree    ) { return book[Agree]; }
-   }
-
-   if(alienType==2){
-      if(m==Hi          ) {one{mood+=.2;} return book[Hi];  } 
-      if(m==Refuel      ) {one{ }  return mood>.7 ? book[Agree] : book[Disagree]; }
-      if(m==Happy       ) {one{if(mood>.5){mood += .2;}} return mood>.7 ? book[Happy] : book[Disagree]; }
-      if(m==Angry       ) {one{if(mood<.5){mood -= .2;}} return mood<.4 ? book[Angry] : book[Disagree]; }
-      if(m==Back_off    ) {one{printf("awo\n");} two{alienAttack();}mood=0; return book[Back_off]; }
-      if(m==Agree       ) {one{} return book[Question]; }
-      if(m==Disagree    ) {one{} return book[Question]; }
-   }
-   if(alienType==3){
-      if(m==Refuel      ) { return book[Agree]; }
-      if(m==Hi          ) { return book[Agree]; } 
-      if(m==Question    ) { return book[Agree]; }
-      if(m==Ignore      ) { return book[Agree]; }
-      if(m==Refuel      ) { return book[Agree]; }
-      if(m==Rearm       ) { return book[Agree]; }
-      if(m==Figth       ) { return book[Agree]; }
-      if(m==Happy       ) { return book[Agree]; }
-      if(m==Angry       ) { return book[Agree]; }
-      if(m==Hostile     ) { return book[Agree]; }
-      if(m==Back_off    ) { return book[Agree]; }
-      if(m==Agree       ) { return book[Agree]; }
-      if(m==Disagree    ) { return book[Agree]; }
-   }
-
-   return book[m];
-}
 
 
 
@@ -454,7 +526,6 @@ V drwMainDisp(disp* d, Uint32* p){
 #define  w d->B.w
 #define  xo d->B.x
 #define  yo d->B.y
-F t = 0;
 #define SigDispCol mixCol(  mixCol(mixCol(signalLog[pnt], 0xFF000000, signalPwrLog[pnt], MT_MIX),mixCol(signalLogA[pnt], 0xFF000000, signalPwrLogA[pnt], MT_MIX),1,MT_ADD) , snoiseLog[pnt], 1,MT_ADD) 
 V drwSignalDisp(disp* d, Uint32* p){
    for(I y= 0; y< h; y++) {
@@ -565,7 +636,83 @@ I new = 0;
 I newReady=0;
 F pressPwr=0;
 I last;
+V wintune(F dt){
+      static F wonMusTiem = 0;
+
+      enum {
+         NOTE_NONE = 0x00000000,
+
+         NOTE_C3 = 0xFFFF0000,
+         NOTE_C4 = 0xFF00FF00,
+         NOTE_C5 = 0xFF0000FF,
+
+         OCTAVE_C3_C4 = 0xFFFFFF00,
+         OCTAVE_C3_C5 = 0xFFFF00FF,
+         OCTAVE_C4_C5 = 0xFF00FFFF,
+         OCTAVE_C3_C4_C5 = 0xFFFFFFFF,
+
+         OCTAVE_C3_C4_SOFT = 0xFF404000,
+         OCTAVE_C3_C5_SOFT = 0xFF400040,
+         OCTAVE_C4_C5_SOFT = 0xFF004040,
+
+         STACK_C3_HEAVY = 0xFFC04040,
+         STACK_C4_HEAVY = 0xFF40C040,
+         STACK_C5_HEAVY = 0xFF4040C0,
+
+         STACK_BALANCED_LOW = 0xFF804020,
+         STACK_BALANCED_MID = 0xFF408040,
+         STACK_BALANCED_HIGH = 0xFF204080,
+      };
+
+
+      static const uint32_t music[] = {
+   NOTE_C4, NOTE_C5, NOTE_C4, NOTE_NONE,
+   NOTE_C3, NOTE_C4, OCTAVE_C4_C5, NOTE_NONE,
+
+   NOTE_C4, NOTE_C5, NOTE_C4, NOTE_NONE,
+   NOTE_C3, OCTAVE_C3_C4, NOTE_C5, NOTE_NONE,
+
+   NOTE_C5, OCTAVE_C4_C5, NOTE_C5, NOTE_NONE,
+   NOTE_C4, NOTE_C3, OCTAVE_C3_C5, NOTE_NONE,
+
+   NOTE_C4, NOTE_C5, OCTAVE_C3_C4, NOTE_C4,
+   OCTAVE_C3_C5, NOTE_NONE, OCTAVE_C3_C4_C5, NOTE_NONE,
+};
+      wonMusTiem += dt * 4;
+      if(wonMusTiem >= (F)(sizeof(music) / sizeof(music[0]))) wonMusTiem = 0;
+
+      static const F noteLen = 0.85f;
+      int i = (int)wonMusTiem;
+      F stepFrac = wonMusTiem - (F)i;
+
+      snoiseLog[sigIdx] = (stepFrac < noteLen) ? music[i] : 0;
+
+}
+F warpDelay=0;
+F warpPreDelay=0;
+F actCd=0;
+
+
+#define CANACT (warpPreDelay<0 && !won && !lost && actCd<0)
 V tick(F dt){
+   playShoot-=dt;if (playShoot>0&&playShoot<.3){boomEffect=1.9; }
+   playShoot-=dt;if (playShoot<0&&playShoot>-10){playShoot=-11;}
+   boomEffect-=dt;
+   warpEffect-=dt;
+   if (fireEffect>0 && fireEffect<.9&&alienShow){ fight();}
+   fireEffect-=dt;
+
+   warpDelay-=dt; if (warpDelay<0){ warpDelay=-1;}
+   actCd-=dt; if (actCd<0){ actCd=-1;}
+
+   warpPreDelay-=dt; if (warpPreDelay<0 && warpPreDelay> -99){ warp(); warpPreDelay=-100;}
+
+   if(won){wintune(dt);}
+   if(won || lost ){
+      if(MKEYS[1]==2){
+         if(inBox(mx, my, (*ebtns[ebtn]).B)){ebtns[ebtn]->fnc();}
+      }
+   }
    if(alienCd>=0){alienCd-=dt;if(alienCd<=0.01){alienCd=-1 ; newAlien();}}
    acc+=dt*30;
    t+=dt;
@@ -575,7 +722,7 @@ V tick(F dt){
            if(inBox(mx, my, (*btns[i]).B)){btns[i]->fnc();}
       }
    }
-   if(MKEYS[1]){
+   if(MKEYS[1] && CANACT){
       if(newReady){ signalLog[sigPrevIdx] = 0;}
       if(inBox(mx, my, (*btns[1]).B)){btns[1]->fnc(); pressPwr+=dt*16;if(last!=1 || newReady){ new+=1;newReady=0;last=1;} }
       ef(inBox(mx, my, (*btns[2]).B)){btns[2]->fnc(); pressPwr+=dt*16;if(last!=2 || newReady){ new+=1;newReady=0;last=2;} }
@@ -608,7 +755,6 @@ V tick(F dt){
    if(!MKEYS[1]){ newReady=1; }
    /*VOLUME*///weee hardcode af volume bar!
    /*VOLUME*/if(MKEYS[1] && mx>210 && mx < (220+375+15) && abs(my-(280))<15 ){ sinePlayerVolume(((F)mx-220.0)/375.0); } 
-   
 }
 V events(){
    SDL_Event e;
@@ -670,21 +816,51 @@ V render(){
    for(I i = 0; i < MX_BTNS; i++){
       drwBtn(btns[i]);
    }
+  if(won||lost){ drwBtn(ebtns[ebtn]); }
    SDL_Rect bookdst = {-30, 170, 300, 300};
+  
+   /*SCREEN REGION*/ SDL_Rect clip = {245, 30, 360, 240};
+   #define STARTCLIP SDL_RenderSetClipRect(rend, &clip);
+   #define ENDCLIP   SDL_RenderSetClipRect(rend, NULL);
 
    /*meter   */ float PER=1-((F)fuel/(F)fuelMax);
    /*meter   */ I meterH=190;
    /*meter   */ SDL_Rect meterdst= {600, 50+meterH*PER, 100, 190-meterH*PER};
    /*meter   */ SDL_Rect metersrc= {0, 0+meterH*PER, 100, 190-meterH*PER};
    /*meter   */ SDL_RenderCopy(rend, txs[TXmeter].tx, &metersrc, &meterdst);
-   /*CROSSHAIR*/ if(alienShow){
-  /*CROSSHAIR*/ SDL_Rect clip = {245, 30, 360, 240}, crossdst = {245 + alienX - 352, 30 + alienY - 59, 421, 283};
-  /*CROSSHAIR*/ SDL_RenderSetClipRect(rend, &clip); 
-  /*CROSSHAIR*/ SDL_RenderCopy(rend, txs[TXcross].tx, NULL, &crossdst); 
-  /*CROSSHAIR*/ SDL_RenderSetClipRect(rend, NULL);
-   /*CROSSHAIR*/}
-   //
+STARTCLIP
 
+      SDL_Rect shipDst= {245 + alienX - 90, 30 + alienY - 60, 180,120 };
+
+if(playShoot>0){
+      SDL_RenderCopy(rend, animFrames[ANshoot][(I)((playShootMax-playShoot)*12)%16].tx , NULL, &shipDst);
+   } ef(alienShow ){
+      SDL_RenderCopy(rend, animFrames[ANship][(I)(t*6)%120].tx , NULL, &shipDst);
+   }
+   /*CROSSHAIR*/; if(alienShow && 0){
+  /*CROSSHAIR*/ SDL_Rect crossdst = {245 + alienX - 352, 30 + alienY - 59, 421, 283};
+  /*CROSSHAIR*/ 
+  /*CROSSHAIR*/ SDL_RenderCopy(rend, txs[TXcross].tx, NULL, &crossdst); 
+   /*CROSSHAIR*/} 
+   
+  /*PROGRESS*/ SDL_Rect prgdst = {150-(360-100)*(1-((F)prog)/((F)progMAX)), 18, 450, 75};
+  /*PROGRESS*/ SDL_RenderCopy(rend, txs[TXprog].tx, NULL, &prgdst); 
+   
+  /*CROSSHAIR*/ 
+   
+
+
+   /*SCREEN REGION*/ SDL_Rect fireclip = {245+alienX-180, 30+alienY-120, 360, 240};
+if(fireEffect>0){
+      SDL_RenderCopy(rend, animFrames[ANfire][(I)((fireEffectMax-fireEffect)*12)%24].tx , NULL, &fireclip);
+   }
+if(boomEffect>0){
+      SDL_RenderCopy(rend, animFrames[ANboom][(I)((2.0-boomEffect)*12)%24].tx , NULL, &clip);
+   }
+if(warpEffect>0){
+      SDL_RenderCopy(rend, animFrames[ANwarp][(I)((warpEffectMax-warpEffect)*12)%12].tx , NULL, &clip);
+   }
+ENDCLIP
    SDL_RenderCopy(rend, txs[TXfg].tx, NULL, &dst);//FG=====================================
    /*VOLUME*/ SDL_Rect voldst= {200, 250, 450, 50};  SDL_RenderCopy(rend, txs[TXVol].tx, NULL, &voldst);
    /*VOLUME*/ I PEGDST=6;
@@ -762,16 +938,28 @@ V mainLoop(){
 #endif
 }
 
+V win(){won=1;ebtn=0;printf("WINNJER\n");};
 
-V OPTflyAway(){
-   //if (mood<.5){takeDmg();}
+V OPTnewgame(){reset();}
+V warp(){
    rmFuel();
    alienLeave();
+   alienShow=0;
    RwarpPowNoise=.7;
    GwarpPowNoise=2;
    BwarpPowNoise=1.5;
-   alienCd=rand()%10;
+   alienCd=2+rand()%4;
+   prog++;
+   if(prog==progMAX){win();}
    printStats();
+   warpEffect=warpEffectMax;
+   warpDelay=1.0;
+}
+V OPTflyAway(){
+   if(warpDelay>0){return;}
+   if (mood<.5 && alienShow){playShoot=playShootMax;takeDmg();}
+   warpDelay=2.0;
+   warpPreDelay=playShoot;
 
 }
 V OPTtrade(){
@@ -786,13 +974,18 @@ V OPTtrade(){
    printStats();
 }
 
-V OPTfight(){
-   if(!alienShow){return;}
+V fight(){
    alienLeave();
-   ammo--;
    RwarpPowNoise=3;
    GwarpPowNoise=.4;
    BwarpPowNoise=8;
+}
+
+V OPTfight(){
+   if(!alienShow){return;}
+   fireEffect=fireEffectMax;
+   actCd=fireEffectMax;
+   ammo--;
    printStats();
 }
 V initBTN(){
@@ -817,6 +1010,10 @@ V initBTN(){
    btns[5] = newBtn((Box){diagBtnsX + diagBtnXOff * 1, diagBtnsY + diagBtnYOff * 1, btnW, btnH}, "res/btns/btnN.png", "res/btns/btnH.png", "res/btns/btnP.png", OPTflyAway);
    btns[6] = newBtn((Box){diagBtnsX + diagBtnXOff * 2, diagBtnsY + diagBtnYOff * 2, btnW, btnH}, "res/btns/btnN.png", "res/btns/btnH.png", "res/btns/btnP.png", OPTfight);
 
+   ebtns[0] = newBtn((Box){280,50,300,170}, "res/btns/ehome.png", "res/btns/ehomeh.png", "res/btns/ehomep.png",    OPTnewgame );
+   ebtns[1] = newBtn((Box){280,50,300,170}, "res/btns/efuel.png", "res/btns/efuelh.png", "res/btns/efuelp.png",    OPTnewgame );
+   ebtns[2] = newBtn((Box){280,50,300,170}, "res/btns/ebroke.png", "res/btns/ebrokeh.png", "res/btns/ebrokep.png", OPTnewgame );
+
 }
 I init(){
    running=1;
@@ -827,15 +1024,33 @@ I init(){
    disp2 = newDisp((Box){200, 290, signalLogW, 60}, drwSignalDisp);
 
    //init empty signal
-   for(I i = 0; i < signalLogW; i++){ t++; generateNoiseSignal();}
 
    initBTN();
 
+   //
+   //txture txs[TX_COUNT] = {
+   // [TXspace] = { "res/screen/space180x120.png", NULL },
 
    for (int i = 0; i < TX_COUNT; i++) {
       txs[i].tx = IMG_LoadTexture(rend, txs[i].path);
       if (!txs[i].tx) { printf("IMG_LoadTexture failed: %s\n", IMG_GetError()); return 0;}
    }
+
+   ////////////////////
+   /////animation frames
+
+   for (int a = 0; a < AN_COUNT; a++) {
+      animFrames[a] = malloc(sizeof(txture) * animsCnt[a]);
+      for (int i = 0; i < animsCnt[a]; i++) {
+         snprintf(animFrames[a][i].path, sizeof(animFrames[a][i].path), "%s%04d.png", anims[a].path, i + 1);
+
+         animFrames[a][i].tx = IMG_LoadTexture(rend, animFrames[a][i].path);
+         if (!animFrames[a][i].tx) { printf("IMG_LoadTexture failed: %s\n", IMG_GetError()); return 0; }
+      }
+   }
+
+   ////////////////////////
+
    printf("init'd\n");
 
    SDL_Init(SDL_INIT_AUDIO);
