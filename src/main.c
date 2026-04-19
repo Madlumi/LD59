@@ -1052,37 +1052,37 @@ ENDCLIP
 
    SDL_RenderCopy(rend, animFrames[ANBook][(I)(BookIdx)%7].tx , NULL, &bookdst);
    drwBtn(btns[1]);
-   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
-   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
-   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
-   if(MKEYS[2]){
-      time_t t = time(NULL);
-      struct tm *tmv = localtime(&t);
-      if(!tmv){ printf("localtime fail\n"); return; }
-
-      char path[64];
-      strftime(path, sizeof(path), "shot_%H%M%S.png", tmv);
-
-      SDL_Surface *shot = SDL_CreateRGBSurfaceWithFormat(0, W, H, 32, SDL_PIXELFORMAT_ARGB8888);
-      if(!shot){ printf("screenshot surface fail: %s\n", SDL_GetError()); return; }
-
-      if(SDL_RenderReadPixels(rend, NULL, SDL_PIXELFORMAT_ARGB8888, shot->pixels, shot->pitch) != 0){
-         printf("SDL_RenderReadPixels fail: %s\n", SDL_GetError());
-         SDL_FreeSurface(shot);
-         return;
-      }
-
-      if(IMG_SavePNG(shot, path) != 0){
-         printf("IMG_SavePNG fail: %s\n", IMG_GetError());
-      }else{
-         printf("saved %s\n", path);
-      }
-
-      SDL_FreeSurface(shot);
-   }
-   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
-   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
-   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
+//   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
+//   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
+//   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
+//   if(MKEYS[2]){
+//      time_t t = time(NULL);
+//      struct tm *tmv = localtime(&t);
+//      if(!tmv){ printf("localtime fail\n"); return; }
+//
+//      char path[64];
+//      strftime(path, sizeof(path), "shot_%H%M%S.png", tmv);
+//
+//      SDL_Surface *shot = SDL_CreateRGBSurfaceWithFormat(0, W, H, 32, SDL_PIXELFORMAT_ARGB8888);
+//      if(!shot){ printf("screenshot surface fail: %s\n", SDL_GetError()); return; }
+//
+//      if(SDL_RenderReadPixels(rend, NULL, SDL_PIXELFORMAT_ARGB8888, shot->pixels, shot->pitch) != 0){
+//         printf("SDL_RenderReadPixels fail: %s\n", SDL_GetError());
+//         SDL_FreeSurface(shot);
+//         return;
+//      }
+//
+//      if(IMG_SavePNG(shot, path) != 0){
+//         printf("IMG_SavePNG fail: %s\n", IMG_GetError());
+//      }else{
+//         printf("saved %s\n", path);
+//      }
+//
+//      SDL_FreeSurface(shot);
+//   }
+//   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
+//   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
+//   //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
    SDL_RenderPresent(rend);
    SDL_DestroyTexture( ScTx);
 }
