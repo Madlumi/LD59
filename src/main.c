@@ -54,6 +54,7 @@ enum animId{
     ANwarp,
     ANfire,
     ANsky,
+    ANBook,
     AN_COUNT
 };
 typedef struct {
@@ -70,6 +71,7 @@ int animsCnt[AN_COUNT] = {
     [ANboom] = 24,
     [ANfire] = 24,
     [ANsky] = 24,
+    [ANBook] = 7,
 };
 
 txture anims[AN_COUNT] = {
@@ -79,6 +81,7 @@ txture anims[AN_COUNT] = {
     [ANwarp] = { "res/anim/warp/", NULL },
     [ANfire] = { "res/anim/fire/", NULL },
     [ANsky] = { "res/anim/sky/", NULL },
+    [ANBook] = { "res/anim/book/", NULL },
 };
 
 txture *animFrames[AN_COUNT] = {0};
@@ -111,10 +114,11 @@ typedef enum {
 } sigCol;
 
 typedef enum {
-   Hi, Question, Ignore,
-   Refuel,  Rearm, Figth,
-   Happy,   Angry, Hostile,
-   Back_off, Agree, Disagree,
+   Hi, Resupply, Happy, Agree, //positive
+   Angry, Hostile, Back_off , Disagre, //negative
+   Figth ,Identify,Opinion, Question, //standard
+   Nslime,Nbug,Ngrey, Ncyber, //names
+   Ignore, //i dun remember why we haz this
    Msg_COUNT
 } Msg;
 //structs=============================================
@@ -178,7 +182,7 @@ static I fpsFrames = 0;
 #define BGNoiseStr .1
 I alienX, alienY;
 I running;
-I hp; I fuel; I fuelMax=10, hpMax=5, ammo, ammoMax=3, prog, progMAX=10;
+I hp; I fuel; I fuelMax=10, hpMax=3, ammo, ammoMax=3, prog, progMAX=10;
 I won=0;
 I lost=0;
 I skyTex=0;
@@ -219,6 +223,11 @@ I actTaken[Msg_COUNT];
 F mood= 0;
 I alienType=2;
 //arrays=============================================
+//ALIEN=============================================
+//ALIEN=============================================
+//ALIEN=============================================
+
+
 
 typedef enum {
    ALbug,
@@ -229,78 +238,140 @@ typedef enum {
 } AlienType;
 
 MsgCode alienTalkStandard[Msg_COUNT] = {
-   [Hi]        = { { BLACK, BLACK, BLACK, BLACK }, Hi       },
-   [Question]  = { { RED,   BLUE,  GREEN, PINK  }, Question },
-   [Ignore]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
-   [Refuel]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
-   [Rearm]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
-   [Figth]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
+   [Hi]        = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
+   [Resupply]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
    [Happy]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
+   [Agree]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
+
    [Angry]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
    [Hostile]   = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
    [Back_off]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
-   [Agree]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
-   [Disagree]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
+   [Disagre]   = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
+
+   [Figth]     = { { RED,   PINK,  RED,   BLUE  }, Figth    },
+   [Identify]  = { { BLUE,  GREEN, BLUE,  PINK  }, Identify },
+   [Opinion]   = { { GREEN, PINK,  GREEN, BLUE  }, Opinion  },
+   [Question]  = { { RED,   BLUE,  GREEN, PINK  }, Question },
+
+   [Nslime]    = { { GREEN, GREEN, GREEN, GREEN }, Nslime   },
+   [Nbug]      = { { PINK,  RED,   PINK,  RED   }, Nbug     },
+   [Ngrey]     = { { BLUE,  BLUE,  GREEN, GREEN }, Ngrey    },
+   [Ncyber]    = { { RED,   GREEN, PINK,  BLUE  }, Ncyber   },
+
+   [Ignore]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore   },
 };
 
+// bug
+// does not like talking but will trade
+// likes repetition
+// likes red, blue
+// can provide ammo
 MsgCode alienTalk1[Msg_COUNT] = {
    [Hi]        = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Question]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Ignore]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Refuel]    = { { RED,   PINK,  BLUE,  GREEN }, Refuel    },
-   [Rearm]     = { { GREEN, RED,   PINK,  BLUE  }, Rearm     },
-   [Figth]     = { { BLUE,  GREEN, RED,   PINK  }, Figth     },
-   [Happy]     = { { PINK,  BLUE,  GREEN, RED   }, Happy     },
-   [Angry]     = { { RED,   GREEN, PINK,  BLUE  }, Angry     },
-   [Hostile]   = { { BLUE,  PINK,  RED,   GREEN }, Hostile   },
+   [Resupply]  = { { RED,   PINK,  GREEN, BLUE  }, Resupply  }, // shared colourcode with slime Resupply
+   [Happy]     = { { BLUE,  PINK,  BLUE,  RED   }, Happy     }, // shared colourcode with slime Agree
+   [Agree]     = { { RED,   GREEN, PINK,  BLUE  }, Agree     }, // shared colourcode with slime Happy
+
+   [Angry]     = { { RED,   BLUE,  RED,   PINK  }, Angry     },
+   [Hostile]   = { { PINK,  BLUE,  RED,   BLUE  }, Hostile   }, // shared colourcode with cyber Hi
    [Back_off]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Agree]     = { { GREEN, BLUE,  RED,   PINK  }, Agree     },
-   [Disagree]  = { { BLACK,  BLACK,   BLACK,  BLACK}, Disagree  },
+   [Disagre]   = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+
+   [Figth]     = { { BLUE,  RED,   PINK,  RED   }, Figth     },
+   [Identify]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Opinion]   = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Question]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+
+   [Nslime]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Nbug]      = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Ngrey]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Ncyber]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+
+   [Ignore]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
 };
 
+// grey
+// needs to be intimidated
+// hates variety
+// hates red
 MsgCode alienTalk2[Msg_COUNT] = {
-   [Hi]        = { { RED,   BLUE,  PINK,  GREEN }, Hi        },
-   [Question]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Ignore]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Refuel]    = { { GREEN, PINK,  RED,   BLUE  }, Refuel    },
-   [Rearm]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Figth]     = { { PINK,  GREEN, BLUE,  RED   }, Figth     },
+   [Hi]        = { { GREEN, BLUE,  GREEN, GREEN }, Hi        }, // shared colourcode with slime Hi
+   [Resupply]  = { { BLUE,  GREEN, GREEN, PINK  }, Resupply  },
    [Happy]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Agree]     = { { BLUE,  GREEN, PINK,  GREEN }, Agree     },
+
    [Angry]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Hostile]   = { { BLUE,  RED,   GREEN, PINK  }, Hostile   },
-   [Back_off]  = { { RED,   GREEN, BLUE,  PINK  }, Back_off  },
-   [Agree]     = { { GREEN, BLUE,  PINK,  RED   }, Agree     },
-   [Disagree]  = { { PINK,  RED,   GREEN, BLUE  }, Disagree  },
+   [Hostile]   = { { GREEN, BLUE,  BLUE,  PINK  }, Hostile   },
+   [Back_off]  = { { PINK,  GREEN, GREEN, PINK  }, Back_off  }, // shared colourcode with slime Disagre
+   [Disagre]   = { { PINK,  BLUE,  GREEN, BLUE  }, Disagre   },
+
+   [Figth]     = { { BLUE,  BLUE,  PINK,  GREEN }, Figth     },
+   [Identify]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Opinion]   = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Question]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+
+   [Nslime]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Nbug]      = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Ngrey]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Ncyber]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+
+   [Ignore]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
 };
 
+// slime
+// player can sweettalk into exta fuel
+// loves green
+// has a lot of influnce from other languages and loan words
 MsgCode alienTalk3[Msg_COUNT] = {
-   [Hi]        = { { GREEN, BLUE, GREEN, GREEN }, Hi        },
-   [Question]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Ignore]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Refuel]    = { { RED,   PINK,  GREEN, BLUE  }, Refuel    },
-   [Rearm]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Figth]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Happy]     = { { GREEN, RED,   BLUE,  PINK  }, Happy     },
+   [Hi]        = { { GREEN, BLUE,  GREEN, GREEN }, Hi        }, // shared colourcode with grey Hi
+   [Resupply]  = { { RED,   PINK,  GREEN, BLUE  }, Resupply  }, // shared colourcode with bug Resupply
+   [Happy]     = { { RED,   GREEN, PINK,  BLUE  }, Happy     }, // shared colourcode with bug Agree
+   [Agree]     = { { BLUE,  PINK,  BLUE,  RED   }, Agree     }, // shared colourcode with bug Happy
+
    [Angry]     = { { PINK,  BLUE,  RED,   GREEN }, Angry     },
    [Hostile]   = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Back_off]  = { { BLUE,  PINK,  GREEN, RED   }, Back_off  },
-   [Agree]     = { { RED,   GREEN, PINK,  BLUE  }, Agree     },
-   [Disagree]  = { { GREEN, BLUE,  RED,   PINK  }, Disagree  },
+   [Back_off]  = { { BLUE,  PINK,  GREEN, RED   }, Back_off  }, // shared colourcode with cyber Disagre
+   [Disagre]   = { { PINK,  GREEN, GREEN, PINK  }, Disagre   }, // shared colourcode with grey Back_off
+
+   [Figth]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Identify]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Opinion]   = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Question]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+
+   [Nslime]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Nbug]      = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Ngrey]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Ncyber]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+
+   [Ignore]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
 };
 
+// cyber
+// player must politely ask to keep their distance or get shot
+// likes red, purple
+// likes elaborate patterns
 MsgCode alienTalk4[Msg_COUNT] = {
-   [Hi]        = { { PINK,  RED,   GREEN, BLUE  }, Hi        },
-   [Question]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Ignore]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Refuel]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Rearm]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Figth]     = { { GREEN, RED,   PINK,  BLUE  }, Figth     },
+   [Hi]        = { { PINK,  BLUE,  RED,   BLUE  }, Hi        }, // shared colourcode with bug Hostile
+   [Resupply]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
    [Happy]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
-   [Angry]     = { { RED,   BLUE,  GREEN, PINK  }, Angry     },
-   [Hostile]   = { { BLUE,  GREEN, RED,   PINK  }, Hostile   },
-   [Back_off]  = { { PINK,  GREEN, BLUE,  RED   }, Back_off  },
-   [Agree]     = { { GREEN, PINK,  RED,   BLUE  }, Agree     },
-   [Disagree]  = { { BLUE,  RED,   PINK,  GREEN }, Disagree  },
+   [Agree]     = { { BLUE,  PINK,  BLUE,  RED   }, Agree     }, // shared colourcode with slime Agree
+
+   [Angry]     = { { BLUE,  RED,   PINK,  RED   }, Angry     },
+   [Hostile]   = { { BLUE,  RED,   BLUE,  GREEN }, Hostile   },
+   [Back_off]  = { { PINK,  GREEN, GREEN, PINK  }, Back_off  }, // shared colourcode with grey/slime
+   [Disagre]   = { { BLUE,  PINK,  GREEN, RED   }, Disagre   }, // shared colourcode with slime Back_off
+
+   [Figth]     = { { RED,   PINK,  RED,   BLUE  }, Figth     }, // same as standard Figth
+   [Identify]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Opinion]   = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Question]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+
+   [Nslime]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Nbug]      = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Ngrey]     = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+   [Ncyber]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
+
+   [Ignore]    = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
 };
 
 F playShootMax=1.6;
@@ -312,80 +383,162 @@ F fireEffectMax=2;
 F fireEffect=-1;
 
 typedef struct {
-   //-1 to 1, negative means they need to be under that possitive value, ie intimidation
+   // -1 to 1, negative means they need to be under that positive value, ie intimidation
    F rerefuel; // + 1 fuel
    F rearm;    // + 1 ammo
    F fireFlee; // will fire at you if you run away
-}alienTreshold;
+} alienTreshold;
 
 alienTreshold alienTresholds[Alien_COUNT] = {
-   [ALbug]   = { .rerefuel =  0.2f, .rearm = 0.2f, .fireFlee = -.4f },
-   [ALgrey]  = { .rerefuel =  -0.4f, .rearm = -0.4f, .fireFlee =  0.5f },
-   [ALslime] = { .rerefuel =  0.7f, .rearm = 0.8f, .fireFlee = -0.3f },
-   [ALcyber] = { .rerefuel = -0.2f, .rearm = 0.5f, .fireFlee = -0.8f },
+   [ALbug]   = { .rerefuel =  0.2f, .rearm =  0.2f, .fireFlee = -0.4f },
+   [ALgrey]  = { .rerefuel = -0.4f, .rearm = -0.4f, .fireFlee =  0.5f },
+   [ALslime] = { .rerefuel =  0.7f, .rearm =  0.8f, .fireFlee = -0.3f },
+   [ALcyber] = { .rerefuel = -0.2f, .rearm =  0.5f, .fireFlee = -0.8f },
 };
+
+Msg alienName(){
+   if(alienType==ALbug  ){ return Nbug;   }
+   if(alienType==ALgrey ){ return Ngrey;  }
+   if(alienType==ALslime){ return Nslime; }
+   return Ncyber;
+}
+
+MsgCode alienOpinionCode(F op){
+   if(op <= .15f) return (MsgCode){ { RED,   RED,   RED,   RED   }, Opinion };
+   if(op <= .35f) return (MsgCode){ { GREEN, RED,   RED,   RED   }, Opinion };
+   if(op <= .65f) return (MsgCode){ { GREEN, GREEN, RED,   RED   }, Opinion };
+   if(op <= .85f) return (MsgCode){ { GREEN, GREEN, GREEN, RED   }, Opinion };
+   return              (MsgCode){ { GREEN, GREEN, GREEN, GREEN }, Opinion };
+}
 
 MsgCode alienInterpret(sigCol in[4]){
    Msg m = decodeAlienMsg(in);
    MsgCode *book = getAlienBook();
 
-   if(!msgKnown(book, m)){ return alienTalkStandard[Question]; }
+   if(!msgKnown(book, m) && !msgKnown(alienTalkStandard, m)){
+      return alienTalkStandard[Question];
+   }
 
    I taken = actTaken[m];
    actTaken[m] = 1;
    #define one if(!taken)
    #define two if(taken)
-   alienTreshold *t = &alienTresholds[alienType];
    #define moodPass(v) ((v) < 0 ? (mood <= -(v)) : (mood >= (v)))
 
-   //does not like talking but will trade
+   alienTreshold *t = &alienTresholds[alienType];
+   I canSupply = moodPass(t->rerefuel) || moodPass(t->rearm);
+   I cowed     = moodPass(t->rerefuel);
+
+
+   // bug
+   // does not like talking but will trade
+   // likes repetition
+   // likes red, blue
    if(alienType==ALbug){
-      if(m==Refuel      ) {                              two{mood -= .1; return book[Angry]; } return moodPass(t->rerefuel) ? book[Agree] : book[Angry]; }
-      if(m==Rearm       ) {                              two{mood -= .1; return book[Angry]; } return moodPass(t->rearm)    ? book[Agree] : book[Angry]; }
-      if(m==Figth       ) { if(mood<.2){alienAttack();}  two{mood -= .1; return book[Angry]; } return book[Angry]; }
-      if(m==Happy       ) {                              two{mood -= .1; return book[Angry]; } return moodPass(t->rerefuel) ? book[Agree] : book[Angry]; }
-      if(m==Angry       ) { if(mood<.1){alienAttack();}  two{mood -= .1; return book[Angry]; } return book[Agree]; }
-      if(m==Hostile     ) { if(mood<.1){alienAttack();}  two{mood -= .1; return book[Angry]; } return book[Angry]; }
-      if(m==Agree       ) {                              two{mood -= .1; return book[Angry]; } return moodPass(t->rerefuel) ? book[Refuel] : book[Angry]; }
+      if(m==Identify    ) { mood -= .22f; return alienTalkStandard[alienName()]; }
+      if(m==Opinion     ) { mood -= .10f; return alienOpinionCode(mood); }
+
+      if(m==Nbug        ) { one{mood += .15f;} return book[Agree]; }
+      if(m==Nslime      ) {      mood -= .25f;  return book[Angry]; }
+      if(m==Ngrey       ) {      mood -= .10f;  return book[Question]; }
+      if(m==Ncyber      ) {      mood -= .05f;  return book[Question]; }
+
+      if(m==Resupply    ) { one{} two{mood += .10f;}     return canSupply ? book[Agree] : book[Angry]; }
+      if(m==Agree       ) { one{return book[Agree];}     two{return canSupply ? book[Resupply] : book[Agree];} }
+      if(m==Angry       ) { one{mood += .05f;}           return book[Agree]; }
+      if(m==Happy       ) {                              mood -= .08f; return book[Angry]; }
+      if(m==Figth       ) { if(mood<.2f){alienAttack();} return book[Angry]; }
+      if(m==Hostile     ) { if(mood<.1f){alienAttack();} return book[Angry]; }
+      mood -= .03f; //negative from any interaction
    }
 
-   //needs to be intimidated
+   // grey
+   // needs to be intimidated
+   // hates variety
+   // hates red
    if(alienType==ALgrey){
-      if(m==Hi          ) {one{mood+=.1;} if(!moodPass(t->fireFlee)){ return book[Back_off]; } return book[Hi]; }
-      if(m==Refuel      ) {one{}          return moodPass(t->rerefuel) ? book[Agree] : book[Back_off]; }
-      if(m==Figth       ) {one{mood-=.3;} if(!moodPass(t->fireFlee)){ return book[Back_off]; } return book[Disagree]; }
-      if(m==Hostile     ) {one{mood-=.3;} if(!moodPass(t->fireFlee)){ return book[Back_off]; } return book[Disagree]; }
-      if(m==Back_off    ) {one{mood=0;}   if(!moodPass(t->fireFlee)){ return book[Back_off]; } return book[Agree]; }
-      if(m==Agree       ) {one{}          if(!moodPass(t->fireFlee)){ return book[Back_off]; } return book[Agree]; }
-      if(m==Disagree    ) {one{}          if(!moodPass(t->fireFlee)){ return book[Back_off]; } return book[Agree]; }
+      if(m==Identify    ) { mood -= .18f; return alienTalkStandard[alienName()]; }
+      if(m==Opinion     ) { mood -= .12f; return alienOpinionCode(mood); }
+
+      if(m==Ngrey       ) { one{mood -= .20f;} return cowed ? book[Agree] : book[Disagre]; }
+      if(m==Nbug        ) {                     return book[Question]; }
+      if(m==Nslime      ) {                     return book[Question]; }
+      if(m==Ncyber      ) {                     return book[Question]; }
+
+      if(m==Hi          ) { one{mood += .10f;} return book[Back_off]; }
+      if(m==Agree       ) { one{mood += .05f;} return book[Back_off]; }
+      if(m==Disagre     ) { one{}              return cowed ? book[Agree]    : book[Back_off]; }
+      if(m==Back_off    ) { one{mood += .05f;} return book[Back_off]; }
+
+      if(m==Hostile     ) { one{mood -= .30f;} return cowed ? book[Agree]    : book[Disagre]; }
+      if(m==Figth       ) { one{mood -= .50f;} return cowed ? book[Resupply] : book[Disagre]; }
+      if(m==Resupply    ) { one{}              return canSupply ? book[Agree] : book[Back_off]; }
    }
 
-   //player can sweettalk into exta fuel
+   // slime
+   // player can sweettalk into exta fuel
+   // loves green
+   // has a lot of influnce from other languages and loan words
    if(alienType==ALslime){
-      if(m==Hi          ) {one{mood+=.2;}                            return book[Hi]; }
-      if(m==Refuel      ) {one{}                                     return moodPass(t->rerefuel) ? book[Agree] : book[Disagree]; }
-      if(m==Happy       ) {one{mood += .2;}                          return mood>.7 ? book[Happy] : book[Disagree]; }
-      if(m==Angry       ) {one{if(mood<.5){mood -= .2;}}             return mood<.4 ? book[Angry] : book[Disagree]; }
-      if(m==Back_off    ) {one{} two{alienAttack();} mood=0;         return book[Back_off]; }
-      if(m==Agree       ) {one{}                                     return book[Happy]; }
-      if(m==Disagree    ) {one{}                                     return book[Angry]; }
+      if(m==Identify    ) { mood -= .10f; return alienTalkStandard[alienName()]; }
+      if(m==Opinion     ) { mood -= .03f; return alienOpinionCode(mood); }
+
+      if(m==Nslime      ) { one{mood += .30f;} return book[Nslime]; }//happy
+      if(m==Nbug        ) { one{mood -= .4f;} return book[Angry]; }//enemv
+      if(m==Ngrey       ) { one{} return book[Question]; }
+      if(m==Ncyber      ) { one{} return book[Question]; }
+
+      if(m==Hi          ) { one{mood += .20f;} return book[Hi]; }
+      if(m==Happy       ) { one{mood += .20f;} return mood>.7f ? book[Happy] : book[Disagre]; }
+      if(m==Agree       ) { one{mood += .20f;} return book[Happy]; }
+      if(m==Resupply    ) { one{mood += .10f;} return canSupply ? book[Agree] : book[Disagre]; }
+
+      if(m==Angry       ) { one{mood -= .20f;} return mood<.4f ? book[Angry] : book[Disagre]; }
+      if(m==Disagre     ) { one{mood -= .20f;} return book[Angry]; }
+      if(m==Figth       ) { one{mood -= .25f;} return book[Angry]; }
+      if(m==Back_off    ) { one{} two{alienAttack();} mood=0.f; return book[Back_off]; }
    }
 
-   //player must politely ask to keep their distance or get shot
+   // cyber
+   // player must politely ask to keep their distance or get shot
+   // likes red, purple
+   // likes elaborate patterns
    if(alienType==ALcyber){
-      if(m==Hi          ) { one{mood += .1;} return book[Back_off]; }
-      if(m==Figth       ) { alienAttack();    return book[Agree]; }
-      if(m==Angry       ) {                   return book[Angry]; }
-      if(m==Hostile     ) { alienAttack();    return book[Agree]; }
-      if(m==Back_off    ) { one{mood +=1;}    return book[Agree]; }
-      if(m==Agree       ) {                   return book[Back_off]; }
-      if(m==Disagree    ) {                   return book[Back_off]; }
+      if(m==Identify    ) { mood -= .20f; return alienTalkStandard[alienName()]; }
+      if(m==Opinion     ) { mood -= .07f; return alienOpinionCode(mood); }
+
+      if(m==Ncyber      ) {                     return book[Question]; }
+      if(m==Nbug        ) {                     return book[Question]; }
+      if(m==Ngrey       ) {                     return book[Question]; }
+      if(m==Nslime      ) {                     return book[Question]; }
+
+      if(m==Hi          ) { one{mood += .10f;} return book[Back_off]; }
+      if(m==Agree       ) {                     return book[Back_off]; }
+      if(m==Disagre     ) {                     return book[Back_off]; }
+      if(m==Resupply    ) {                     return book[Back_off]; }
+
+      if(m==Back_off    ) { one{mood += 1.f;}   return book[Agree]; }
+      if(m==Angry       ) {                     return book[Angry]; }
+      if(m==Figth       ) { alienAttack();      return book[Agree]; }
+      if(m==Hostile     ) { alienAttack();      return book[Agree]; }
    }
-   return book[m];
+
+   return msgKnown(book, m) ? book[m] : alienTalkStandard[m];
 }
+
+//NEILA=============================================
+//NEILA=============================================
+//NEILA=============================================
+//NEILA=============================================
+
 
 
 //declares============================================
+//
+I BookIdx=1;
+F warpDelay=0;
+F warpPreDelay=0;
+F actCd=0;
 F t = 0;
 I alienShow=0; 
 I alienRefueled=0;
@@ -401,6 +554,13 @@ V reset(){
    ammo=ammoMax;
    fuel=fuelMax*.5;
    alienCd=3;
+   warpDelay = -1;
+   warpPreDelay = -100;
+   actCd = -1;
+   playShoot = -11;
+   boomEffect = -1;
+   warpEffect = -1;
+   fireEffect = -1;
 }
 
 //helpers
@@ -428,11 +588,11 @@ V addFuel(){
 }
 V rmFuel(){
    fuel--;
-   if(fuel<0){fuel=0;printf("outta fuel"); lost=1; ebtn=1; }
+   if(fuel<=0){fuel=0; lost=1; ebtn=1; }
 }
 V takeDmg(){
    hp-=1;
-   if(hp<0){hp=0;printf("outta hp"); lost=1; ebtn=2;}
+   if(hp<=0){hp=0;; lost=1; ebtn=2;}
 }
 MsgCode *getAlienBook(void){
    if(alienType==0){ return alienTalk1; }
@@ -463,7 +623,7 @@ V newAlien(){
    RwarpPowNoise=((rand()%10)*.1+.7);
    GwarpPowNoise=((rand()%10)*.1+.7);
    BwarpPowNoise=((rand()%10)*.1+.7);
-   mood=rand()%100*.01;
+   mood=rand()%50*.01+2.5;
    for(I i= 0; i <Msg_COUNT;i++){ actTaken[i]=0; }
    alienShow=1;
    alienX=(rand()%140+20)*2;
@@ -471,7 +631,8 @@ V newAlien(){
 
 }
 V alienAttack(){
- playShoot=playShootMax;
+   playShoot=playShootMax;
+   printf("pewpew");
    alienLeave();
    takeDmg();
 }
@@ -695,14 +856,11 @@ V wintune(F dt){
       snoiseLog[sigIdx] = (stepFrac < noteLen) ? music[i] : 0;
 
 }
-F warpDelay=0;
-F warpPreDelay=0;
-F actCd=0;
 
 
 #define CANACT (warpPreDelay<0 && !won && !lost && actCd<0)
 V tick(F dt){
-   playShoot-=dt;if (playShoot>0&&playShoot<.3){boomEffect=1.9; }
+   if (playShoot>0&&playShoot<.3){boomEffect=1.9; }
    playShoot-=dt;if (playShoot<0&&playShoot>-10){playShoot=-11;}
    boomEffect-=dt;
    warpEffect-=dt;
@@ -716,7 +874,7 @@ V tick(F dt){
 
    if(won){wintune(dt);}
    if(won || lost ){
-      if(MKEYS[1]==2){
+      if(MKEYS[1]){
          if(inBox(mx, my, (*ebtns[ebtn]).B)){ebtns[ebtn]->fnc();}
       }
    }
@@ -724,9 +882,16 @@ V tick(F dt){
    acc+=dt*30;
    t+=dt;
    if(!alienShow){new=0;}
-   if(MKEYS[1]==2 && CANACT){
+   if(MKEYS[1] && CANACT){
       for(I i = 0; i < MX_BTNS; i++){
            if(inBox(mx, my, (*btns[i]).B)){btns[i]->fnc();}
+      }
+   }
+   if(MKEYS[1]==2 && CANACT){
+         SDL_Rect bookdst = {-30, 170, 300, 300};
+      if(my>170 && my<170+300){
+         if (mx>0 && mx<150-30){if(BookIdx>0) BookIdx-=1;}
+         if (mx>150-30 && mx<300-30){ if(BookIdx<6) BookIdx+=1;}
       }
    }
    if(MKEYS[1] && CANACT){
@@ -755,7 +920,7 @@ V tick(F dt){
       if(signalLog[sigIdx]==0){AlsilentCount++;}else{AlsilentCount=0;}
 
       if(AlsilentCount>AlresponseDelay&& new>=4){ new=0; readSignalbuffer();AlsilentCount=0;}
-      ef(AlsilentCount>AlresponseDelay*1.5){ new=0; AlsilentCount=0;}
+      ef(AlsilentCount>AlresponseDelay*3){ new=0; AlsilentCount=0;}
       acc-=1;
    }
 
@@ -884,12 +1049,13 @@ ENDCLIP
    SDL_RenderCopy(rend, txs[TXhullmeter].tx, &hmetersrc, &hmeterdst);
    //
 
-   SDL_RenderCopy(rend, txs[TXbook0].tx, NULL, &bookdst);
+
+   SDL_RenderCopy(rend, animFrames[ANBook][(I)(BookIdx)%7].tx , NULL, &bookdst);
    drwBtn(btns[1]);
    //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
    //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
    //****************TODO DELETE SHITTY SCREENSHOT CODE******************************''
-   if(MKEYS[2]==2){
+   if(MKEYS[2]){
       time_t t = time(NULL);
       struct tm *tmv = localtime(&t);
       if(!tmv){ printf("localtime fail\n"); return; }
@@ -966,9 +1132,10 @@ V warp(){
 
 
 V OPTflyAway(){
+   if(!CANACT){return;}
+   if(warpDelay>0){ printf("warpDelay: %.3f", warpDelay);return;}
    alienTreshold *t = &alienTresholds[alienType];
-
-   if(warpDelay>0){return;}
+   playShoot=0;
    if(alienShow && moodPass(t->fireFlee)){
       playShoot=playShootMax;
       takeDmg();
