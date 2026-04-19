@@ -53,6 +53,7 @@ enum animId{
     ANboom,
     ANwarp,
     ANfire,
+    ANsky,
     AN_COUNT
 };
 typedef struct {
@@ -68,6 +69,7 @@ int animsCnt[AN_COUNT] = {
     [ANwarp] = 12,
     [ANboom] = 24,
     [ANfire] = 24,
+    [ANsky] = 24,
 };
 
 txture anims[AN_COUNT] = {
@@ -76,6 +78,7 @@ txture anims[AN_COUNT] = {
     [ANboom] = { "res/anim/boom/", NULL },
     [ANwarp] = { "res/anim/warp/", NULL },
     [ANfire] = { "res/anim/fire/", NULL },
+    [ANsky] = { "res/anim/sky/", NULL },
 };
 
 txture *animFrames[AN_COUNT] = {0};
@@ -175,9 +178,10 @@ static I fpsFrames = 0;
 #define BGNoiseStr .1
 I alienX, alienY;
 I running;
-I hp; I fuel; I fuelMax=5, hpMax=5, ammo, ammoMax=3, prog, progMAX=10;
+I hp; I fuel; I fuelMax=10, hpMax=5, ammo, ammoMax=3, prog, progMAX=10;
 I won=0;
 I lost=0;
+I skyTex=0;
 F alienCd=3;
 
 
@@ -251,7 +255,7 @@ MsgCode alienTalk1[Msg_COUNT] = {
    [Hostile]   = { { BLUE,  PINK,  RED,   GREEN }, Hostile   },
    [Back_off]  = { { BLACK, BLACK, BLACK, BLACK }, Ignore    },
    [Agree]     = { { GREEN, BLUE,  RED,   PINK  }, Agree     },
-   [Disagree]  = { { PINK,  RED,   BLUE,  GREEN }, Disagree  },
+   [Disagree]  = { { BLACK,  BLACK,   BLACK,  BLACK}, Disagree  },
 };
 
 MsgCode alienTalk2[Msg_COUNT] = {
@@ -315,10 +319,10 @@ typedef struct {
 }alienTreshold;
 
 alienTreshold alienTresholds[Alien_COUNT] = {
-   [ALbug]   = { .rerefuel =  0.0f, .rearm = 0.0f, .fireFlee = -1.0f },
-   [ALgrey]  = { .rerefuel =  0.2f, .rearm = 0.4f, .fireFlee = -0.8f },
-   [ALslime] = { .rerefuel =  0.7f, .rearm = 0.8f, .fireFlee =  0.3f },
-   [ALcyber] = { .rerefuel = -0.2f, .rearm = 0.5f, .fireFlee =  0.8f },
+   [ALbug]   = { .rerefuel =  0.2f, .rearm = 0.2f, .fireFlee = -.4f },
+   [ALgrey]  = { .rerefuel =  -0.4f, .rearm = -0.4f, .fireFlee =  0.5f },
+   [ALslime] = { .rerefuel =  0.7f, .rearm = 0.8f, .fireFlee = -0.3f },
+   [ALcyber] = { .rerefuel = -0.2f, .rearm = 0.5f, .fireFlee = -0.8f },
 };
 
 MsgCode alienInterpret(sigCol in[4]){
@@ -334,47 +338,49 @@ MsgCode alienInterpret(sigCol in[4]){
    alienTreshold *t = &alienTresholds[alienType];
    #define moodPass(v) ((v) < 0 ? (mood <= -(v)) : (mood >= (v)))
 
+   //does not like talking but will trade
    if(alienType==ALbug){
-      if(m==Refuel      ) { return book[Agree]; }
-      if(m==Rearm       ) { return book[Agree]; }
-      if(m==Figth       ) { return book[Agree]; }
-      if(m==Happy       ) { return book[Agree]; }
-      if(m==Angry       ) { return book[Agree]; }
-      if(m==Hostile     ) { return book[Agree]; }
-      if(m==Agree       ) { return book[Agree]; }
-      if(m==Disagree    ) { return book[Agree]; }
+      if(m==Refuel      ) {                              two{mood -= .1; return book[Angry]; } return moodPass(t->rerefuel) ? book[Agree] : book[Angry]; }
+      if(m==Rearm       ) {                              two{mood -= .1; return book[Angry]; } return moodPass(t->rearm)    ? book[Agree] : book[Angry]; }
+      if(m==Figth       ) { if(mood<.2){alienAttack();}  two{mood -= .1; return book[Angry]; } return book[Angry]; }
+      if(m==Happy       ) {                              two{mood -= .1; return book[Angry]; } return moodPass(t->rerefuel) ? book[Agree] : book[Angry]; }
+      if(m==Angry       ) { if(mood<.1){alienAttack();}  two{mood -= .1; return book[Angry]; } return book[Agree]; }
+      if(m==Hostile     ) { if(mood<.1){alienAttack();}  two{mood -= .1; return book[Angry]; } return book[Angry]; }
+      if(m==Agree       ) {                              two{mood -= .1; return book[Angry]; } return moodPass(t->rerefuel) ? book[Refuel] : book[Angry]; }
    }
 
+   //needs to be intimidated
    if(alienType==ALgrey){
-      if(m==Hi          ) { return book[Agree]; }
-      if(m==Refuel      ) { return book[Agree]; }
-      if(m==Figth       ) { return book[Agree]; }
-      if(m==Hostile     ) { return book[Agree]; }
-      if(m==Back_off    ) { return book[Agree]; }
-      if(m==Agree       ) { return book[Agree]; }
-      if(m==Disagree    ) { return book[Agree]; }
+      if(m==Hi          ) {one{mood+=.1;} if(!moodPass(t->fireFlee)){ return book[Back_off]; } return book[Hi]; }
+      if(m==Refuel      ) {one{}          return moodPass(t->rerefuel) ? book[Agree] : book[Back_off]; }
+      if(m==Figth       ) {one{mood-=.3;} if(!moodPass(t->fireFlee)){ return book[Back_off]; } return book[Disagree]; }
+      if(m==Hostile     ) {one{mood-=.3;} if(!moodPass(t->fireFlee)){ return book[Back_off]; } return book[Disagree]; }
+      if(m==Back_off    ) {one{mood=0;}   if(!moodPass(t->fireFlee)){ return book[Back_off]; } return book[Agree]; }
+      if(m==Agree       ) {one{}          if(!moodPass(t->fireFlee)){ return book[Back_off]; } return book[Agree]; }
+      if(m==Disagree    ) {one{}          if(!moodPass(t->fireFlee)){ return book[Back_off]; } return book[Agree]; }
    }
 
+   //player can sweettalk into exta fuel
    if(alienType==ALslime){
-      if(m==Hi          ) {one{mood+=.2;}                                   return book[Hi];  } 
-      if(m==Refuel      ) {one{}                                            return moodPass(t->rerefuel) ? book[Agree] : book[Disagree]; }
-      if(m==Happy       ) {one{mood += .2;}                                 return mood>.7 ? book[Happy] : book[Disagree]; }
-      if(m==Angry       ) {one{if(mood<.5){mood -= .2;}}                    return mood<.4 ? book[Angry] : book[Disagree]; }
-      if(m==Back_off    ) {one{}          two{alienAttack();}mood=0;        return book[Back_off]; }
-      if(m==Agree       ) {one{}                                            return book[Happy]; }
-      if(m==Disagree    ) {one{}                                            return book[Angry]; }
+      if(m==Hi          ) {one{mood+=.2;}                            return book[Hi]; }
+      if(m==Refuel      ) {one{}                                     return moodPass(t->rerefuel) ? book[Agree] : book[Disagree]; }
+      if(m==Happy       ) {one{mood += .2;}                          return mood>.7 ? book[Happy] : book[Disagree]; }
+      if(m==Angry       ) {one{if(mood<.5){mood -= .2;}}             return mood<.4 ? book[Angry] : book[Disagree]; }
+      if(m==Back_off    ) {one{} two{alienAttack();} mood=0;         return book[Back_off]; }
+      if(m==Agree       ) {one{}                                     return book[Happy]; }
+      if(m==Disagree    ) {one{}                                     return book[Angry]; }
    }
 
+   //player must politely ask to keep their distance or get shot
    if(alienType==ALcyber){
-      if(m==Hi          ) { return book[Agree]; }
-      if(m==Figth       ) { return book[Agree]; }
-      if(m==Angry       ) { return book[Agree]; }
-      if(m==Hostile     ) { return book[Agree]; }
-      if(m==Back_off    ) { return book[Agree]; }
-      if(m==Agree       ) { return book[Agree]; }
-      if(m==Disagree    ) { return book[Agree]; }
+      if(m==Hi          ) { one{mood += .1;} return book[Back_off]; }
+      if(m==Figth       ) { alienAttack();    return book[Agree]; }
+      if(m==Angry       ) {                   return book[Angry]; }
+      if(m==Hostile     ) { alienAttack();    return book[Agree]; }
+      if(m==Back_off    ) { one{mood +=1;}    return book[Agree]; }
+      if(m==Agree       ) {                   return book[Back_off]; }
+      if(m==Disagree    ) {                   return book[Back_off]; }
    }
-
    return book[m];
 }
 
@@ -393,7 +399,7 @@ V reset(){
    for(I i = 0; i < signalLogW; i++){ snoiseLog[i]=0xFF000000; signalLog[i]=0xFF000000; signalLogA[i]=0xFF000000; signalPwrLogA[i]=0;signalPwrLog[i]=0;}
    for(I i = 0; i < signalLogW; i++){ t++; generateNoiseSignal(); }
    ammo=ammoMax;
-   fuel=fuelMax*.7;
+   fuel=fuelMax*.5;
    alienCd=3;
 }
 
@@ -465,6 +471,7 @@ V newAlien(){
 
 }
 V alienAttack(){
+ playShoot=playShootMax;
    alienLeave();
    takeDmg();
 }
@@ -520,7 +527,7 @@ UI mixCol(UI c1, UI c2, F pow, mixType t){
 
 V drwMainDisp(disp* d, Uint32* p){
    SDL_Rect dst= {(*d).B.x,(*d).B.y,(*d).B.w,(*d).B.h};
-   SDL_RenderCopy(rend, txs[TXspace].tx, NULL, &dst);
+   SDL_RenderCopy(rend, animFrames[ANsky][skyTex%24].tx, NULL, &dst);
 }
 #define  h d->B.h
 #define  w d->B.w
@@ -717,7 +724,7 @@ V tick(F dt){
    acc+=dt*30;
    t+=dt;
    if(!alienShow){new=0;}
-   if(MKEYS[1]==2){
+   if(MKEYS[1]==2 && CANACT){
       for(I i = 0; i < MX_BTNS; i++){
            if(inBox(mx, my, (*btns[i]).B)){btns[i]->fnc();}
       }
@@ -954,20 +961,42 @@ V warp(){
    printStats();
    warpEffect=warpEffectMax;
    warpDelay=1.0;
+   skyTex=rand();
 }
+
+
 V OPTflyAway(){
+   alienTreshold *t = &alienTresholds[alienType];
+
    if(warpDelay>0){return;}
-   if (mood<.5 && alienShow){playShoot=playShootMax;takeDmg();}
+   if(alienShow && moodPass(t->fireFlee)){
+      playShoot=playShootMax;
+      takeDmg();
+   }
    warpDelay=2.0;
    warpPreDelay=playShoot;
 
+   alienRefueled=0;
 }
+
 V OPTtrade(){
-   if(alienRefueled){return; playSoundError();}
+   alienTreshold *t = &alienTresholds[alienType];
+   I gotFuel = moodPass(t->rerefuel);
+   I gotAmmo = moodPass(t->rearm);
+
+   if(alienRefueled){
+      playSoundError();
+      return;
+   }
+
    alienRefueled=1;
-   if (mood>.65){addFuel();}
-   else {takeDmg();}
-   if (mood<.5){takeDmg();}
+
+   if(gotFuel){ addFuel(); }
+   if(gotAmmo){ ammo++;if(ammo>ammoMax){ammo--;} }
+
+   if(!gotFuel && !gotAmmo){ playShoot=playShootMax; actCd=playShoot+.2; takeDmg(); alienLeave(); return; }
+      
+
    RwarpPowNoise=.3;
    GwarpPowNoise=.6;
    BwarpPowNoise=.4;
@@ -988,6 +1017,8 @@ V OPTfight(){
    ammo--;
    printStats();
 }
+
+
 V initBTN(){
    int btnH = 75;
    int btnW = 85;
