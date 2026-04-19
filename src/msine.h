@@ -9,6 +9,9 @@ typedef uint32_t UI;
 static SDL_AudioDeviceID asDev;
 static SDL_AudioSpec as;
 F VOLUME;
+F usrVOLUME;
+F midVol=1;
+F maxVol=3;
 
 /* cool notes
    C2 =  65.41f
@@ -35,6 +38,9 @@ F Boff=0;
 #define L i*2+0
 #define R i*2+1
 F smooth = 0.0015f;
+static inline F softclip(F x){
+    return x / (1.0f + fabsf(x));
+}
 V sinePlayerTick(){
    if(!asDev){ return; }
    while( SDL_GetQueuedAudioSize(asDev) < AMAXBUFF){
@@ -55,6 +61,8 @@ V sinePlayerTick(){
          if(Roff > 2.0f * (F)M_PI){ Roff -= 2.0f * (F)M_PI; }
          if(Goff > 2.0f * (F)M_PI){ Goff -= 2.0f * (F)M_PI; }
          if(Boff > 2.0f * (F)M_PI){ Boff -= 2.0f * (F)M_PI; }
+         buf[L] = softclip(buf[L]);
+         buf[R] = softclip(buf[R]);
       }
 
       //send buffer to sdl and it plays
@@ -70,11 +78,16 @@ V sinePlayerFreq(UI col){
 }
 V sinePlayerVolume(F v){
    if(v>1){v=1;} if(v<0){v=0;}
-   VOLUME=v;
+   usrVOLUME=v;
+   VOLUME=usrVOLUME*maxVol;
+   VOLUME = maxVol * pow(usrVOLUME, log(midVol/maxVol)/log(0.5));
+   //uv=0 =>   v=0
+   //uv=.5 =>  v=midVol
+   //uv=1.0 => v=maxVol
 }
 V sinePlayerInit(){
-   sinePlayerVolume(.5);
-   sinePlayerFreq(0xFFFFFFFF);
+   sinePlayerVolume(.4);
+   sinePlayerFreq(0xFF000000);
    SDL_AudioSpec asTarg= {0};
    asTarg.freq=48000;
    asTarg.format=AUDIO_F32SYS;

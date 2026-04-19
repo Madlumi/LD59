@@ -29,29 +29,9 @@ typedef double D;
 typedef struct {I x,y,w,h;} Box;
 typedef struct _disp{Box B; SDL_Surface* sf; V (*fnc)(struct _disp* , Uint32* );} disp;
 typedef struct {Box B; SDL_Texture* tx; SDL_Texture* txH;SDL_Texture* txP; V (*fnc)(V); I status;} Btn;
-//declares============================================
-#if printfps
-static F fpsTimer = 0;
-static I fpsFrames = 0;
-#endif
-#define W 948
-#define H 533
-#define PS W*H
-I alienX, alienY;
-I running;
-I hp; I fuel; I fuelMax=10, hpMax=10;
-F alienCd=3;
-V reset(){
-   hp=hpMax;
-   fuel=fuelMax*.7;
-   alienCd=3;
-}
-
-typedef struct {
-    char path[128];
-    SDL_Texture *tx;
-} txture;
-
+//TEXTURES=====================================================================================================================
+//TEXTURES=====================================================================================================================
+//TEXTURES=====================================================================================================================
 enum txIdx {
     TXspace,
     TXbg,
@@ -60,10 +40,16 @@ enum txIdx {
     TXhullmeter,
     TXquestion,
     TXcross,
+    TXrocket,
+    TXrocketshade,
+    TXVol,TXVolpeg,TXVolpegL,
     TXbook0,
     TX_COUNT
 };
-
+typedef struct {
+    char path[128];
+    SDL_Texture *tx;
+} txture;
 txture txs[TX_COUNT] = {
     [TXspace] = { "res/screen/space180x120.png", NULL },
     [TXbg] = { "res/ld59bg.png", NULL },
@@ -72,39 +58,16 @@ txture txs[TX_COUNT] = {
     [TXhullmeter] = { "res/hullmeter.png", NULL },
     [TXquestion] = { "res/qestion.png", NULL },
     [TXcross] = { "res/crosshair.png", NULL },
+    [TXrocket] = { "res/rocket.png", NULL },
+    [TXrocketshade] = { "res/rocketshade.png", NULL },
+    [TXVol] = { "res/volume.png", NULL },
+    [TXVolpeg] = { "res/volumePeg.png", NULL },
+    [TXVolpegL] = { "res/volumePegLift.png", NULL },
     [TXbook0] = { "res/book/ld59book_0000.png", NULL },
 };
-
-I mx; I my; //mouse
-#define mkeyn 12 
-I MKEYS[mkeyn];
-
-SDL_Window     *wind;
-SDL_Renderer   *rend;
-SDL_Surface    *surf;
-disp* disp1;
-disp* disp2;
-#define MX_BTNS 7
-Btn* btns[MX_BTNS];
-I AlresponseDelay=20;
-I AlsilentCount;
-
-#define  signalLogW 450
-Uint32 signalLog[signalLogW];
-F signalPwrLog[signalLogW];
-Uint32 signalLogA[signalLogW];
-F signalPwrLogA[signalLogW];
-Uint32 snoiseLog[signalLogW];
-F signalLogPoint=0;
-
-//helpers
-I inBox(I x, I y, Box B){
-   if(x<B.x || y< B.y){return 0;}
-   if(x-B.w > B.x || y-B.h> B.y){return 0;}
-
-   return 1;
-}
-
+//Enums===========================================================================================================================================
+//Enums===========================================================================================================================================
+//Enums===========================================================================================================================================
 typedef enum {
    BLACK =  0xFF000000,
    RED   = 0xFFFF94B2,
@@ -120,15 +83,49 @@ typedef enum {
    Back_off, Agree, Disagree,
    Msg_COUNT
 } Msg;
-I actTaken[Msg_COUNT];
-
-
-
+//structs=============================================
 typedef struct {
    sigCol in[4]; 
    Msg    m;
 } MsgCode;
+//declares============================================
+V reset();
+I inBox(I x, I y, Box B);
+V printStats();
+V addFuel();
+V rmFuel();
+V takeDmg();
+I msgKnown(MsgCode *book, Msg m);
+V alienLeave();
+V newAlien();
+V alienAttack();
+V playSoundError( );
+V quit();
+V drwMainDisp(disp* d, Uint32* p);
+V drwSignalDisp(disp* d, Uint32* p);
+V drawDisp(disp* d, Uint32* p);
+V setDrwCol(I c);
+V setDrwCol0();
+V setDrwCol1();
+V setDrwCol2();
+V setDrwCol3();
+V setDrwCol4();
+V generateNoiseSignal();
+I sigMod(I i);
+V readSignalbuffer();
+V tick(F dt);
+V events();
+V drwBtn(Btn* b);
+V render();
+V mainLoop();
+V OPTflyAway();
+V OPTtrade();
+V OPTfight();
+V initBTN();
+I init();
+I main();
 
+//arrays=============================================
 MsgCode alienTalkStandard[Msg_COUNT] = {
    [Hi]        = { { BLACK, BLACK, BLACK, BLACK }, Hi       },
    [Question]  = { { RED,   BLUE,  GREEN, PINK  }, Question },
@@ -204,6 +201,70 @@ MsgCode alienTalk4[Msg_COUNT] = {
    [Disagree]  = { { BLUE,  RED,   PINK,  GREEN }, Disagree  },
 };
 
+//declares============================================
+#if printfps
+static F fpsTimer = 0;
+static I fpsFrames = 0;
+#endif
+#define W 948
+#define H 533
+#define PS W*H
+#define BGNoiseStr .1
+I alienX, alienY;
+I running;
+I hp; I fuel; I fuelMax=10, hpMax=10, ammo, ammoMax=3;
+F alienCd=3;
+V reset(){
+   hp=hpMax;
+   
+   ammo=ammoMax;
+   fuel=fuelMax*.7;
+   alienCd=3;
+}
+
+
+
+
+I mx; I my; //mouse
+#define mkeyn 12 
+I MKEYS[mkeyn];
+
+SDL_Window     *wind;
+SDL_Renderer   *rend;
+SDL_Surface    *surf;
+disp* disp1;
+disp* disp2;
+#define MX_BTNS 7
+Btn* btns[MX_BTNS];
+I AlresponseDelay=20;
+I AlsilentCount;
+
+F RwarpPowNoise=0;
+F GwarpPowNoise=0;
+F BwarpPowNoise=0;
+#define  warpDecay .95;
+#define  signalLogW 450
+Uint32 signalLog[signalLogW];
+F signalPwrLog[signalLogW];
+Uint32 signalLogA[signalLogW];
+F signalPwrLogA[signalLogW];
+Uint32 snoiseLog[signalLogW];
+F signalLogPoint=0;
+
+//helpers
+I inBox(I x, I y, Box B){
+   if(x<B.x || y< B.y){return 0;}
+   if(x-B.w > B.x || y-B.h> B.y){return 0;}
+
+   return 1;
+}
+
+I actTaken[Msg_COUNT];
+
+
+
+
+
 F mood= 0;
 I alienType=2;
 V printStats(){
@@ -247,9 +308,24 @@ Msg decodeAlienMsg(sigCol in[4]){
 }
 I alienShow=0;
 I alienRefueled=0;
-V alienAttack(){
-   printf("uwu'd\n");
+V alienLeave(){
+   F warpPowNoise=1.5;
    alienShow=0;
+}
+V newAlien(){
+   alienType=rand()%4;
+   RwarpPowNoise=((rand()%10)*.1+.7);
+   GwarpPowNoise=((rand()%10)*.1+.7);
+   BwarpPowNoise=((rand()%10)*.1+.7);
+   mood=rand()%100*.01;
+   for(I i= 0; i <Msg_COUNT;i++){ actTaken[i]=0; }
+   alienShow=1;
+   alienX=(rand()%140+20)*2;
+   alienY=(rand()%60+30)*2;
+
+}
+V alienAttack(){
+   alienLeave();
    takeDmg();
 }
 V playSoundError( ){}
@@ -419,6 +495,7 @@ V setDrwCol4(){ drwCol=PINK; }
 F acc=0;
 
 #define sigIdx ((I)signalLogPoint-1)% signalLogW
+#define sigPrevIdx ((I)signalLogPoint-2)% signalLogW
 V generateNoiseSignal(){
       signalLogPoint+=1;
       snoiseLog[((I)signalLogPoint-1)% signalLogW]=0xFF000000;
@@ -426,8 +503,11 @@ V generateNoiseSignal(){
       I g =(I)(Perlin1D(t*2+37731)*0xFF)&0xFF;
       I b =(I)(Perlin1D(t*2.3+12567)*0xFF)&0xFF;
       I noise = 0xFF000000 | (r << 16) | (g << 8) | b;
-      F noiseStr=Perlin1D(t*115)*.2;
+      F noiseStr=Perlin1D(t*115)*BGNoiseStr;
       snoiseLog[((I)signalLogPoint-1)% signalLogW]= mixCol(noise, 0xFF000000, noiseStr, MT_MIX);
+      snoiseLog[((I)signalLogPoint-1)% signalLogW]= mixCol( 0xFFFF0000, snoiseLog[((I)signalLogPoint-1)% signalLogW], RwarpPowNoise, MT_ADD);
+      snoiseLog[((I)signalLogPoint-1)% signalLogW]= mixCol( 0xFF00FF00, snoiseLog[((I)signalLogPoint-1)% signalLogW], GwarpPowNoise, MT_ADD);
+      snoiseLog[((I)signalLogPoint-1)% signalLogW]= mixCol( 0xFF0000FF, snoiseLog[((I)signalLogPoint-1)% signalLogW], BwarpPowNoise, MT_ADD);
 }
 
 sigCol   resp[4];
@@ -435,13 +515,18 @@ I        respCnt=4;
 I        respSpeed=0;
 I        respGap=0;
 F        respProg=0;
+I sigMod(I i){
+   i %= signalLogW;
+   if(i < 0){ i += signalLogW; }
+   return i;
+}
 V readSignalbuffer(){
    I last=0;
    I cnt=0;
     sigCol msg[4];
    for(I i = 0; i < signalLogW ; i++){
       if(cnt>=4){break;}
-      I c = signalLog[(sigIdx-i)%signalLogW];
+      I c = signalLog[sigMod(sigIdx - i)];
       if(c!=last){ 
          if(c==RED){   msg[3-cnt]=c; cnt++; }
          if(c==GREEN){ msg[3-cnt]=c;cnt++; }
@@ -479,15 +564,7 @@ V readSignalbuffer(){
 I new = 0;
 I newReady=0;
 F pressPwr=0;
-V newAlien(){
-   alienType=2;
-   mood=rand()%100*.01;
-   for(I i= 0; i <Msg_COUNT;i++){ actTaken[i]=0; }
-   alienShow=1;
-   alienX=(rand()%140+20)*2;
-   alienY=(rand()%60+30)*2;
-
-}
+I last;
 V tick(F dt){
    if(alienCd>=0){alienCd-=dt;if(alienCd<=0.01){alienCd=-1 ; newAlien();}}
    acc+=dt*30;
@@ -499,14 +576,17 @@ V tick(F dt){
       }
    }
    if(MKEYS[1]){
-      if(inBox(mx, my, (*btns[1]).B)){btns[1]->fnc(); pressPwr+=dt*6; new+=1*newReady;newReady=0; }
-      ef(inBox(mx, my, (*btns[2]).B)){btns[2]->fnc(); pressPwr+=dt*6; new+=1*newReady;newReady=0; }
-      ef(inBox(mx, my, (*btns[3]).B)){btns[3]->fnc(); pressPwr+=dt*6; new+=1*newReady;newReady=0; }
-      ef(inBox(mx, my, (*btns[4]).B)){btns[4]->fnc(); pressPwr+=dt*6; new+=1*newReady;newReady=0; }
-      else{newReady=1; }
+      if(newReady){ signalLog[sigPrevIdx] = 0;}
+      if(inBox(mx, my, (*btns[1]).B)){btns[1]->fnc(); pressPwr+=dt*16;if(last!=1 || newReady){ new+=1;newReady=0;last=1;} }
+      ef(inBox(mx, my, (*btns[2]).B)){btns[2]->fnc(); pressPwr+=dt*16;if(last!=2 || newReady){ new+=1;newReady=0;last=2;} }
+      ef(inBox(mx, my, (*btns[3]).B)){btns[3]->fnc(); pressPwr+=dt*16;if(last!=3 || newReady){ new+=1;newReady=0;last=3;} }
+      ef(inBox(mx, my, (*btns[4]).B)){btns[4]->fnc(); pressPwr+=dt*16;if(last!=4 || newReady){ new+=1;newReady=0;last=4;} }
       if(pressPwr>1){pressPwr=1;}
-   }else{ pressPwr-=dt*7; if(pressPwr<0){pressPwr=0;} newReady=1; }
+   }else{ pressPwr-=dt*7; if(pressPwr<.1){pressPwr=0;newReady=1;} }
    while(acc > 0){
+      RwarpPowNoise*=warpDecay;
+      GwarpPowNoise*=warpDecay;
+      BwarpPowNoise*=warpDecay;
       generateNoiseSignal();
       signalLog[sigIdx]=0;
       signalLogA[sigIdx]=0;
@@ -525,6 +605,9 @@ V tick(F dt){
       acc-=1;
    }
 
+   if(!MKEYS[1]){ newReady=1; }
+   /*VOLUME*///weee hardcode af volume bar!
+   /*VOLUME*/if(MKEYS[1] && mx>210 && mx < (220+375+15) && abs(my-(280))<15 ){ sinePlayerVolume(((F)mx-220.0)/375.0); } 
    
 }
 V events(){
@@ -571,6 +654,19 @@ V render(){
    drawDisp(disp1, p);
 
 
+   /*AMMO*/
+   I ammoX=695;
+   I ammoY=210;
+   I ammoD=110;
+   for(I i = 0; i < ammo;i++){
+      SDL_Rect rckdst= {ammoX,ammoY-ammoD*i,300,250};
+   SDL_RenderCopy(rend, txs[TXrocketshade].tx, NULL, &rckdst);
+   }
+   for(I i = 0; i < ammo;i++){
+      SDL_Rect rckdst= {ammoX,ammoY-ammoD*i,300,250};
+      SDL_RenderCopy(rend, txs[TXrocket].tx, NULL, &rckdst);
+   }
+   /*AMMO*/
    for(I i = 0; i < MX_BTNS; i++){
       drwBtn(btns[i]);
    }
@@ -588,7 +684,13 @@ V render(){
   /*CROSSHAIR*/ SDL_RenderSetClipRect(rend, NULL);
    /*CROSSHAIR*/}
    //
+
    SDL_RenderCopy(rend, txs[TXfg].tx, NULL, &dst);//FG=====================================
+   /*VOLUME*/ SDL_Rect voldst= {200, 250, 450, 50};  SDL_RenderCopy(rend, txs[TXVol].tx, NULL, &voldst);
+   /*VOLUME*/ I PEGDST=6;
+   /*VOLUME*/ for(I i = 0; i < (375.0/PEGDST)*usrVOLUME;i++){ SDL_Rect volPdst= {220+i*PEGDST, 275, 11, 15}; 
+      if(abs(mx-(220+i*PEGDST))<15&&abs(my-(280))<15){SDL_RenderCopy(rend, txs[TXVolpegL].tx, NULL, &volPdst);}else{ SDL_RenderCopy(rend, txs[TXVolpeg].tx, NULL, &volPdst); }}
+
   /*Question */ SDL_Rect quedst = {430, 220, 200, 50};
   /*Question */ if(alienShow){SDL_RenderCopy(rend, txs[TXquestion].tx, NULL, &quedst);}
    //hull meter
@@ -664,7 +766,11 @@ V mainLoop(){
 V OPTflyAway(){
    //if (mood<.5){takeDmg();}
    rmFuel();
-   alienCd=rand()%5;
+   alienLeave();
+   RwarpPowNoise=.7;
+   GwarpPowNoise=2;
+   BwarpPowNoise=1.5;
+   alienCd=rand()%10;
    printStats();
 
 }
@@ -674,9 +780,19 @@ V OPTtrade(){
    if (mood>.65){addFuel();}
    else {takeDmg();}
    if (mood<.5){takeDmg();}
+   RwarpPowNoise=.3;
+   GwarpPowNoise=.6;
+   BwarpPowNoise=.4;
    printStats();
 }
+
 V OPTfight(){
+   if(!alienShow){return;}
+   alienLeave();
+   ammo--;
+   RwarpPowNoise=3;
+   GwarpPowNoise=.4;
+   BwarpPowNoise=8;
    printStats();
 }
 V initBTN(){
