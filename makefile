@@ -2,6 +2,7 @@ NAME ?= LD59
 WOUT ?= LD59
 LOUT ?= out
 REL  ?= releases
+SOUT ?= $(NAME)-source.zip
 
 SRC        := src/main.c
 SHELL_HTML := src/index.html
@@ -10,6 +11,7 @@ CFLAGS_NATIVE := $(shell sdl2-config --cflags)
 LIBS_NATIVE   := $(shell sdl2-config --libs) -lSDL2_image -lm
 
 EMFLAGS := \
+	-O3 \
 	--use-port=sdl2 \
 	--use-port=sdl2_image:formats=png \
 	--shell-file $(SHELL_HTML) \
@@ -30,26 +32,31 @@ debug-run:
 	./$(LOUT)/$(NAME)
 
 wasm:
-	@mkdir -p $(WOUT)
+	@mkdir -p $(WOUT) $(REL)
 	emcc $(SRC) -o $(WOUT)/index.html $(EMFLAGS)
 
 runwasm: wasm
 	cd $(WOUT) && python3 -m http.server 8000
 
 ldjam: wasm
-	cd $(WOUT) && zip -r $(REL)/$(NAME)-ldjam.zip .
-
+	@mkdir -p $(REL)
+	cd $(WOUT) && zip -r ../$(REL)/$(NAME)-ldjam.zip .
 
 exportSource:
-	zip -r $(SOUT) src makefile res
+	@mkdir -p $(REL)
+	zip -r $(REL)/$(SOUT) src makefile res
+
 linux-release: linux
 	@mkdir -p $(REL)/$(NAME)
 	cp $(LOUT)/$(NAME) $(REL)/$(NAME)/
 	cp -r res $(REL)/$(NAME)/
-	cd $(REL) && zip -r $(REL)/$(NAME)-linux.zip $(NAME)
+	cd $(REL) && zip -r $(NAME)-linux.zip $(NAME)
 
 windows:
 	# mingw or something
 
+releases: linux-release ldjam exportSource
+
 clean:
-	-rm -rf build $(WOUT) $(LOUT) $(REL) $(NAME)-ldjam.zip $(NAME)-linux.zip
+	-rm -rf build $(WOUT) $(LOUT) $(REL)
+
