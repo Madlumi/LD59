@@ -39,6 +39,9 @@ runwasm: wasm
 ldjam: wasm
 	cd $(WOUT) && zip -r ../$(NAME)-ldjam.zip .
 
+
+exportSource:
+	zip -r $(SOUT) src makefile res
 linux-release: linux
 	@mkdir -p $(REL)/$(NAME)
 	cp $(LOUT)/$(NAME) $(REL)/$(NAME)/
