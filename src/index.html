@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html>
 <head>
@@ -13,17 +14,32 @@
       background: #000;
     }
 
-    canvas {
+    #canvas {
       display: block;
       width: 948px;
       height: 533px;
       background: #000;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
+      outline: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
     }
   </style>
 </head>
 <body>
+  <canvas id="canvas" width="948" height="533" oncontextmenu="event.preventDefault()"></canvas>
+
+  <script>
+    var Module = {
+      canvas: document.getElementById("canvas"),
+      doNotCaptureKeyboard: true,
+      print: function() {},
+      printErr: function(x) { console.error(x); }
+    };
+  </script>
+
   {{{ SCRIPT }}}
 </body>
 </html>

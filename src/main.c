@@ -880,16 +880,17 @@ V tick(F dt){
    }
    if(alienCd>=0){alienCd-=dt;if(alienCd<=0.01){alienCd=-1 ; newAlien();}}
    acc+=dt*30;
+   I btnDwn=0;
    t+=dt;
    if(!alienShow){new=0;}
    if(MKEYS[1] && CANACT){
       for(I i = 0; i < MX_BTNS; i++){
-           if(inBox(mx, my, (*btns[i]).B)){btns[i]->fnc();}
+           if(inBox(mx, my, (*btns[i]).B)){btns[i]->fnc();btnDwn=1;}
       }
    }
    if(MKEYS[1]==2 && CANACT){
          SDL_Rect bookdst = {-30, 170, 300, 300};
-      if(my>170 && my<170+300){
+      if(my>170 && my<170+300&&!btnDwn){
          if (mx>0 && mx<150-30){if(BookIdx>0) BookIdx-=1;}
          if (mx>150-30 && mx<300-30){ if(BookIdx<6) BookIdx+=1;}
       }
@@ -1257,6 +1258,7 @@ I init(){
    return 1;
 }
 I main(){
+   SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas");
    SDL_Init(SDL_INIT_VIDEO);
    SDL_CreateWindowAndRenderer(W, H, 0, &wind, &rend);
    surf = SDL_CreateRGBSurfaceWithFormat(0, W, H, 32, SDL_PIXELFORMAT_ARGB8888);
