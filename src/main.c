@@ -15,8 +15,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 //flags
-#define printfps 1
-#define printLog 1
+#define printfps 0
+#define printLog 0
 //macros
 
 typedef float  F;
@@ -424,11 +424,11 @@ MsgCode alienInterpret(sigCol in[4]){
    #define one if(!taken)
    #define two if(taken)
    #define moodPass(v) ((v) < 0 ? (mood <= -(v)) : (mood >= (v)))
+   #define say(mm) (msgKnown(book, (mm)) ? book[(mm)] : alienTalkStandard[(mm)])
 
    alienTreshold *t = &alienTresholds[alienType];
    I canSupply = moodPass(t->rerefuel) || moodPass(t->rearm);
    I cowed     = moodPass(t->rerefuel);
-
 
    // bug
    // does not like talking but will trade
@@ -438,18 +438,18 @@ MsgCode alienInterpret(sigCol in[4]){
       if(m==Identify    ) { mood -= .22f; return alienTalkStandard[alienName()]; }
       if(m==Opinion     ) { mood -= .10f; return alienOpinionCode(mood); }
 
-      if(m==Nbug        ) { one{mood += .15f;} return book[Agree]; }
-      if(m==Nslime      ) {      mood -= .25f;  return book[Angry]; }
-      if(m==Ngrey       ) {      mood -= .10f;  return book[Question]; }
-      if(m==Ncyber      ) {      mood -= .05f;  return book[Question]; }
+      if(m==Nbug        ) { one{mood += .15f;} return say(Agree); }
+      if(m==Nslime      ) {      mood -= .25f;  return say(Angry); }
+      if(m==Ngrey       ) {      mood -= .10f;  return say(Question); }
+      if(m==Ncyber      ) {      mood -= .05f;  return say(Question); }
 
-      if(m==Resupply    ) { one{} two{mood += .10f;}     return canSupply ? book[Agree] : book[Angry]; }
-      if(m==Agree       ) { one{return book[Agree];}     two{return canSupply ? book[Resupply] : book[Agree];} }
-      if(m==Angry       ) { one{mood += .05f;}           return book[Agree]; }
-      if(m==Happy       ) {                              mood -= .08f; return book[Angry]; }
-      if(m==Figth       ) { if(mood<.2f){alienAttack();} return book[Angry]; }
-      if(m==Hostile     ) { if(mood<.1f){alienAttack();} return book[Angry]; }
-      mood -= .03f; //negative from any interaction
+      if(m==Resupply    ) { one{} two{mood += .10f;}     return canSupply ? say(Agree)    : say(Angry); }
+      if(m==Agree       ) { one{return say(Agree);}      two{return canSupply ? say(Resupply) : say(Agree);} }
+      if(m==Angry       ) { one{mood += .05f;}           return say(Agree); }
+      if(m==Happy       ) {                              return mood -= .08f, say(Angry); }
+      if(m==Figth       ) { if(mood<.2f){alienAttack();} return say(Angry); }
+      if(m==Hostile     ) { if(mood<.1f){alienAttack();} return say(Angry); }
+      mood -= .03f;
    }
 
    // grey
@@ -460,19 +460,19 @@ MsgCode alienInterpret(sigCol in[4]){
       if(m==Identify    ) { mood -= .18f; return alienTalkStandard[alienName()]; }
       if(m==Opinion     ) { mood -= .12f; return alienOpinionCode(mood); }
 
-      if(m==Ngrey       ) { one{mood -= .20f;} return cowed ? book[Agree] : book[Disagre]; }
-      if(m==Nbug        ) {                     return book[Question]; }
-      if(m==Nslime      ) {                     return book[Question]; }
-      if(m==Ncyber      ) {                     return book[Question]; }
+      if(m==Ngrey       ) { one{mood -= .20f;} return cowed ? say(Agree)    : say(Disagre); }
+      if(m==Nbug        ) {                     return say(Question); }
+      if(m==Nslime      ) {                     return say(Question); }
+      if(m==Ncyber      ) {                     return say(Question); }
 
-      if(m==Hi          ) { one{mood += .10f;} return book[Back_off]; }
-      if(m==Agree       ) { one{mood += .05f;} return book[Back_off]; }
-      if(m==Disagre     ) { one{}              return cowed ? book[Agree]    : book[Back_off]; }
-      if(m==Back_off    ) { one{mood += .05f;} return book[Back_off]; }
+      if(m==Hi          ) { one{mood += .10f;} return say(Back_off); }
+      if(m==Agree       ) { one{mood += .05f;} return say(Back_off); }
+      if(m==Disagre     ) { one{}              return cowed ? say(Agree)    : say(Back_off); }
+      if(m==Back_off    ) { one{mood += .05f;} return say(Back_off); }
 
-      if(m==Hostile     ) { one{mood -= .30f;} return cowed ? book[Agree]    : book[Disagre]; }
-      if(m==Figth       ) { one{mood -= .50f;} return cowed ? book[Resupply] : book[Disagre]; }
-      if(m==Resupply    ) { one{}              return canSupply ? book[Agree] : book[Back_off]; }
+      if(m==Hostile     ) { one{mood -= .30f;} return cowed ? say(Agree)    : say(Disagre); }
+      if(m==Figth       ) { one{mood -= .50f;} return cowed ? say(Resupply) : say(Disagre); }
+      if(m==Resupply    ) { one{}              return canSupply ? say(Agree) : say(Back_off); }
    }
 
    // slime
@@ -483,20 +483,20 @@ MsgCode alienInterpret(sigCol in[4]){
       if(m==Identify    ) { mood -= .10f; return alienTalkStandard[alienName()]; }
       if(m==Opinion     ) { mood -= .03f; return alienOpinionCode(mood); }
 
-      if(m==Nslime      ) { one{mood += .30f;} return book[Nslime]; }//happy
-      if(m==Nbug        ) { one{mood -= .4f;} return book[Angry]; }//enemv
-      if(m==Ngrey       ) { one{} return book[Question]; }
-      if(m==Ncyber      ) { one{} return book[Question]; }
+      if(m==Nslime      ) { one{mood += .30f;} return say(Nslime); }
+      if(m==Nbug        ) { one{mood -= .4f;}  return say(Angry); }
+      if(m==Ngrey       ) { one{}              return say(Question); }
+      if(m==Ncyber      ) { one{}              return say(Question); }
 
-      if(m==Hi          ) { one{mood += .20f;} return book[Hi]; }
-      if(m==Happy       ) { one{mood += .20f;} return mood>.7f ? book[Happy] : book[Disagre]; }
-      if(m==Agree       ) { one{mood += .20f;} return book[Happy]; }
-      if(m==Resupply    ) { one{mood += .10f;} return canSupply ? book[Agree] : book[Disagre]; }
+      if(m==Hi          ) { one{mood += .20f;} return say(Hi); }
+      if(m==Happy       ) { one{mood += .20f;} return mood>.7f ? say(Happy) : say(Disagre); }
+      if(m==Agree       ) { one{mood += .20f;} return say(Happy); }
+      if(m==Resupply    ) { one{mood += .10f;} return canSupply ? say(Agree) : say(Disagre); }
 
-      if(m==Angry       ) { one{mood -= .20f;} return mood<.4f ? book[Angry] : book[Disagre]; }
-      if(m==Disagre     ) { one{mood -= .20f;} return book[Angry]; }
-      if(m==Figth       ) { one{mood -= .25f;} return book[Angry]; }
-      if(m==Back_off    ) { one{} two{alienAttack();} mood=0.f; return book[Back_off]; }
+      if(m==Angry       ) { one{mood -= .20f;} return mood<.4f ? say(Angry) : say(Disagre); }
+      if(m==Disagre     ) { one{mood -= .20f;} return say(Angry); }
+      if(m==Figth       ) { one{mood -= .25f;} return say(Angry); }
+      if(m==Back_off    ) { one{} two{alienAttack();} mood=0.f; return say(Back_off); }
    }
 
    // cyber
@@ -507,23 +507,23 @@ MsgCode alienInterpret(sigCol in[4]){
       if(m==Identify    ) { mood -= .20f; return alienTalkStandard[alienName()]; }
       if(m==Opinion     ) { mood -= .07f; return alienOpinionCode(mood); }
 
-      if(m==Ncyber      ) {                     return book[Question]; }
-      if(m==Nbug        ) {                     return book[Question]; }
-      if(m==Ngrey       ) {                     return book[Question]; }
-      if(m==Nslime      ) {                     return book[Question]; }
+      if(m==Ncyber      ) {                     return say(Question); }
+      if(m==Nbug        ) {                     return say(Question); }
+      if(m==Ngrey       ) {                     return say(Question); }
+      if(m==Nslime      ) {                     return say(Question); }
 
-      if(m==Hi          ) { one{mood += .10f;} return book[Back_off]; }
-      if(m==Agree       ) {                     return book[Back_off]; }
-      if(m==Disagre     ) {                     return book[Back_off]; }
-      if(m==Resupply    ) {                     return book[Back_off]; }
+      if(m==Hi          ) { one{mood += .10f;} return say(Back_off); }
+      if(m==Agree       ) {                     return say(Back_off); }
+      if(m==Disagre     ) {                     return say(Back_off); }
+      if(m==Resupply    ) {                     return say(Back_off); }
 
-      if(m==Back_off    ) { one{mood += 1.f;}   return book[Agree]; }
-      if(m==Angry       ) {                     return book[Angry]; }
-      if(m==Figth       ) { alienAttack();      return book[Agree]; }
-      if(m==Hostile     ) { alienAttack();      return book[Agree]; }
+      if(m==Back_off    ) { one{mood += 1.f;}  return say(Agree); }
+      if(m==Angry       ) {                     return say(Angry); }
+      if(m==Figth       ) { alienAttack();      return say(Agree); }
+      if(m==Hostile     ) { alienAttack();      return say(Agree); }
    }
 
-   return msgKnown(book, m) ? book[m] : alienTalkStandard[m];
+   return say(m);
 }
 
 //NEILA=============================================
@@ -578,7 +578,7 @@ I inBox(I x, I y, Box B){
 V printStats(){
    if(!printLog){return;}
    printf("fuel: %d\n", fuel);
-   printf("hp:   %d\n", fuel);
+   printf("hp:   %d\n", hp);
    printf("Mood: %.2f\n", mood);
    printf("alien: %d\n",  alienType);
 }
@@ -623,7 +623,7 @@ V newAlien(){
    RwarpPowNoise=((rand()%10)*.1+.7);
    GwarpPowNoise=((rand()%10)*.1+.7);
    BwarpPowNoise=((rand()%10)*.1+.7);
-   mood=rand()%50*.01+2.5;
+   mood=rand()%50*.01+.25;
    for(I i= 0; i <Msg_COUNT;i++){ actTaken[i]=0; }
    alienShow=1;
    alienX=(rand()%140+20)*2;

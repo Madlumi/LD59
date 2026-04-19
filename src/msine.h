@@ -46,7 +46,7 @@ F Boff=0;
 #define AMAXBUFF  sizeof(F) * ABUFF * 8 * AChan
 #define L i*2+0
 #define R i*2+1
-F smooth = 0.0015f;
+F smooth = 0.0005f;
 static inline F softclip(F x){
     return x / (1.0f + fabsf(x));
 }

@@ -1,7 +1,7 @@
 NAME ?= LD59
 WOUT ?= LD59
 LOUT ?= out
-REL  ?= rel
+REL  ?= releases
 
 SRC        := src/main.c
 SHELL_HTML := src/index.html
@@ -37,7 +37,7 @@ runwasm: wasm
 	cd $(WOUT) && python3 -m http.server 8000
 
 ldjam: wasm
-	cd $(WOUT) && zip -r ../$(NAME)-ldjam.zip .
+	cd $(WOUT) && zip -r $(REL)/$(NAME)-ldjam.zip .
 
 
 exportSource:
@@ -46,7 +46,7 @@ linux-release: linux
 	@mkdir -p $(REL)/$(NAME)
 	cp $(LOUT)/$(NAME) $(REL)/$(NAME)/
 	cp -r res $(REL)/$(NAME)/
-	cd $(REL) && zip -r ../$(NAME)-linux.zip $(NAME)
+	cd $(REL) && zip -r $(REL)/$(NAME)-linux.zip $(NAME)
 
 windows:
 	# mingw or something
